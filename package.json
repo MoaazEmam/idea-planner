@@ -11,6 +11,7 @@
     "smoke": "bash scripts/smoke.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:grant": "tsx scripts/grant-postgres.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

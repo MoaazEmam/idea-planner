@@ -68,6 +68,8 @@ export type StandaloneStoredAnalysis = StandaloneAnalysis & {
   promptVersion: number;
   model: string;
   generatedAt: string;
+  /** Hash of the idea text this analysis was produced from. */
+  sourceHash?: string;
   searchQueries: string[];
   sources: AnalysisSource[];
 };
@@ -77,6 +79,7 @@ const standaloneStoredSchema = standaloneAnalysisSchema.extend({
   promptVersion: z.number().int(),
   model: z.string(),
   generatedAt: z.string(),
+  sourceHash: z.string().optional(),
   searchQueries: z.array(z.string()),
   sources: z.array(z.object({ title: z.string(), url: z.string() })),
 });
@@ -122,6 +125,8 @@ export type LinkedStoredAnalysis = LinkedAnalysis & {
   promptVersion: number;
   model: string;
   generatedAt: string;
+  /** Hash of the idea text this analysis was produced from. */
+  sourceHash?: string;
   /** Project name is snapshotted so the analysis reads correctly after a rename. */
   projectId: string;
   projectName: string;
@@ -133,6 +138,7 @@ const linkedStoredSchema = linkedAnalysisSchema.extend({
   promptVersion: z.number().int(),
   model: z.string(),
   generatedAt: z.string(),
+  sourceHash: z.string().optional(),
   projectId: z.string(),
   projectName: z.string(),
   linkType: z.enum(["feature", "spinoff"]),

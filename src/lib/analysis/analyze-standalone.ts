@@ -7,6 +7,7 @@ import {
   standaloneAnalysisSchema,
   type StandaloneStoredAnalysis,
 } from "./schema";
+import { hashText } from "./state";
 
 /** Sources are ranked and truncated: the model sees a bounded, high-signal set. */
 const MAX_SOURCES = 8;
@@ -124,7 +125,7 @@ export async function enrichStandalone(
         content: `Idea:\n"""${ideaText}"""\n\nSources:\n${sourceBlock(sources)}\n\n${USER_INSTRUCTIONS}`,
       },
     ],
-    options: { kind: "analysis", thinking: true, maxTokens: 3000 },
+    options: { kind: "analysis", thinking: true, maxTokens: 12000 },
   });
 
   usage = addUsage(usage, analysisResult.usage);
@@ -147,6 +148,7 @@ export async function enrichStandalone(
       promptVersion: STANDALONE_PROMPT_VERSION,
       model: analysisResult.model,
       generatedAt: new Date().toISOString(),
+      sourceHash: hashText(ideaText),
       searchQueries: queries,
       sources: sources.map((source) => ({
         title: source.title,

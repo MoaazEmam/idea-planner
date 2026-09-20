@@ -38,7 +38,10 @@ export type CompletionResult = {
 
 type DeepSeekChatResponse = {
   model?: string;
-  choices?: { message?: { content?: string } }[];
+  choices?: {
+    message?: { content?: string };
+    finish_reason?: string;
+  }[];
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
@@ -102,9 +105,19 @@ export async function completeJson(
   }
 
   const payload = (await response.json()) as DeepSeekChatResponse;
-  const content = payload.choices?.[0]?.message?.content;
+  const choice = payload.choices?.[0];
+  const content = choice?.message?.content;
   if (typeof content !== "string" || content.length === 0) {
-    throw new Error("DeepSeek returned an empty response");
+    // In thinking mode the reasoning tokens come out of max_tokens, so a short
+    // budget can be spent entirely on reasoning and leave the answer empty.
+    const reason = choice?.finish_reason;
+    throw new Error(
+      reason === "length"
+        ? "DeepSeek hit the output token limit before answering (raise max_tokens)"
+        : `DeepSeek returned an empty response${
+            reason ? ` (finish_reason: ${reason})` : ""
+          }`,
+    );
   }
 
   return {

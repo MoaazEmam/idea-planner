@@ -6,6 +6,7 @@ import {
   linkedAnalysisSchema,
   type LinkedStoredAnalysis,
 } from "./schema";
+import { hashText } from "./state";
 
 /** Project context is free-form and can be long; the model sees a bounded slice. */
 const MAX_CONTEXT_CHARS = 6000;
@@ -83,7 +84,7 @@ Idea:
 ${USER_INSTRUCTIONS}`,
       },
     ],
-    options: { kind: "analysis", thinking: true, maxTokens: 2500 },
+    options: { kind: "analysis", thinking: true, maxTokens: 12000 },
   });
 
   if (!result.ok) {
@@ -104,6 +105,7 @@ ${USER_INSTRUCTIONS}`,
       promptVersion: LINKED_PROMPT_VERSION,
       model: result.model,
       generatedAt: new Date().toISOString(),
+      sourceHash: hashText(ideaText),
       projectId: project.id,
       projectName: project.name,
       linkType: decision.linkType,

@@ -120,6 +120,10 @@ check "deleted idea is 404" "404" "$(status -b "$COOKIE_JAR" "$APP_URL/ideas/$ed
 
 check "delete project 200" "200" "$(status -b "$COOKIE_JAR" -X DELETE "$APP_URL/api/projects/$project_id")"
 
+# The capture test creates a second idea for the edit/delete flow; remove the
+# original too so repeated smoke runs do not leave residue in the inbox.
+check "cleanup capture idea 200" "200" "$(status -b "$COOKIE_JAR" -X DELETE "$APP_URL/api/ideas/$idea_id")"
+
 rm -f "$COOKIE_JAR"
 
 echo

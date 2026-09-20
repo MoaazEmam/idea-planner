@@ -1,0 +1,58 @@
+name: Nightly enrichment
+
+on:
+  schedule:
+    # 17:00 UTC = 19:00 winter (EET) / 20:00 summer (EEST) in Cairo.
+    - cron: "0 17 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: nightly-enrichment
+  cancel-in-progress: false
+
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Route pending ideas
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          WORKER_TOKEN: ${{ secrets.WORKER_TOKEN }}
+          MAX_IDEAS: "25"
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${WORKER_TOKEN:-}" ]; then
+            echo "APP_URL and WORKER_TOKEN repository secrets are required"
+            exit 1
+          fi
+
+          RUN_ID="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "run id: ${RUN_ID}"
+
+          for _ in $(seq 1 "${MAX_IDEAS}"); do
+            body=$(curl -sS -m 120 -w '\n%{http_code}' -X POST "${APP_URL}/api/process" \
+              -H "Authorization: Bearer ${WORKER_TOKEN}" \
+              -H 'Content-Type: application/json' \
+              -d "{\"runId\":\"${RUN_ID}\",\"trigger\":\"cron\"}")
+            code=$(printf '%s' "${body}" | tail -n1)
+            json=$(printf '%s' "${body}" | sed '$d')
+            echo "${json}"
+
+            if [ "${code}" != "200" ]; then
+              echo "request failed with ${code}"
+              exit 1
+            fi
+
+            processed=$(printf '%s' "${json}" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("processed"))')
+            remaining=$(printf '%s' "${json}" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("remaining"))')
+
+            if [ "${processed}" != "True" ] || [ "${remaining}" = "0" ]; then
+              break
+            fi
+          done
+
+          curl -sS -m 30 -X POST "${APP_URL}/api/process" \
+            -H "Authorization: Bearer ${WORKER_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{\"action\":\"finish\",\"runId\":\"${RUN_ID}\"}" || true

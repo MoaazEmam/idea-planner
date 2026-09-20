@@ -3,13 +3,17 @@ import { CaptureForm } from "./capture-form";
 import { IdeaBadge } from "@/components/idea-badge";
 import { RunBanner } from "@/components/run-banner";
 import { formatRelativeTime } from "@/lib/format";
-import { listIdeas } from "@/lib/ideas";
+import { countDeletedIdeas, listIdeas } from "@/lib/ideas";
 import { getLatestRun } from "@/lib/jobs/runs";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [ideas, latestRun] = await Promise.all([listIdeas(), getLatestRun()]);
+  const [ideas, latestRun, deletedCount] = await Promise.all([
+    listIdeas(),
+    getLatestRun(),
+    countDeletedIdeas(),
+  ]);
 
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-8">
@@ -20,9 +24,17 @@ export default async function HomePage() {
       </div>
 
       <section className="mt-10 space-y-3">
-        <h2 className="text-xs uppercase tracking-widest text-neutral-500">
-          Recent ({ideas.length})
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs uppercase tracking-widest text-neutral-500">
+            Recent ({ideas.length})
+          </h2>
+          <Link
+            href="/trash"
+            className="text-xs text-neutral-500 transition hover:text-neutral-300"
+          >
+            Trash{deletedCount > 0 ? ` (${deletedCount})` : ""}
+          </Link>
+        </div>
 
         {ideas.length === 0 ? (
           <p className="text-sm text-neutral-500">Nothing captured yet.</p>

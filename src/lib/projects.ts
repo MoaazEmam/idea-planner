@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { ideas, projects, type Idea, type Project } from "@/db/schema";
+import { unsortedResetFields } from "@/lib/ideas";
 import { isUuid } from "@/lib/ids";
 import type { ProjectInput } from "@/lib/validation/projects";
 
@@ -65,16 +66,34 @@ export async function updateProject(
   return updated;
 }
 
-export async function deleteProject(id: string): Promise<boolean> {
+export type DeleteProjectResult = { deleted: boolean; unlinked: number };
+
+/**
+ * Deletes a project and unlinks its ideas in one transaction. `project_id` is
+ * `onDelete: set null`, which would otherwise leave ideas claiming a feature of
+ * a project that no longer exists; instead they are parked as unsorted so they
+ * can be re-sorted by hand.
+ */
+export async function deleteProject(id: string): Promise<DeleteProjectResult> {
   if (!isUuid(id)) {
-    return false;
+    return { deleted: false, unlinked: 0 };
   }
+
   const db = getDb();
-  const [deleted] = await db
-    .delete(projects)
-    .where(eq(projects.id, id))
-    .returning({ id: projects.id });
-  return Boolean(deleted);
+  return db.transaction(async (tx) => {
+    const unlinked = await tx
+      .update(ideas)
+      .set(unsortedResetFields())
+      .where(eq(ideas.projectId, id))
+      .returning({ id: ideas.id });
+
+    const [deleted] = await tx
+      .delete(projects)
+      .where(eq(projects.id, id))
+      .returning({ id: projects.id });
+
+    return { deleted: Boolean(deleted), unlinked: unlinked.length };
+  });
 }
 
 /** Ideas currently linked to a project, newest first. */

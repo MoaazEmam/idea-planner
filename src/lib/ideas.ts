@@ -1,7 +1,30 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { ideas, projects, type Idea } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
+
+/**
+ * Fields that park an idea as unsorted with no analysis. Shared by manual
+ * de-sorting and by project deletion, so both leave the same clean state.
+ */
+export function unsortedResetFields() {
+  const now = new Date();
+  return {
+    analysisStatus: "routed",
+    analysisAttempts: 0,
+    analysis: null,
+    analysisRaw: null,
+    analysisError: null,
+    linkType: null,
+    linkSource: "manual" as const,
+    linkConfidence: null,
+    projectId: null,
+    routedAt: now,
+    processedAt: null,
+    lockExpiresAt: null,
+    updatedAt: now,
+  };
+}
 
 export type CreateIdeaResult = {
   idea: Idea;
@@ -101,4 +124,35 @@ export async function softDeleteIdea(id: string): Promise<boolean> {
     .where(and(eq(ideas.id, id), isNull(ideas.deletedAt)))
     .returning({ id: ideas.id });
   return Boolean(deleted);
+}
+
+export async function restoreIdea(id: string): Promise<boolean> {
+  if (!isUuid(id)) {
+    return false;
+  }
+  const db = getDb();
+  const [restored] = await db
+    .update(ideas)
+    .set({ deletedAt: null, updatedAt: new Date() })
+    .where(and(eq(ideas.id, id), isNotNull(ideas.deletedAt)))
+    .returning({ id: ideas.id });
+  return Boolean(restored);
+}
+
+export async function listDeletedIdeas(limit = 100): Promise<Idea[]> {
+  const db = getDb();
+  return db.query.ideas.findMany({
+    where: isNotNull(ideas.deletedAt),
+    orderBy: [desc(ideas.deletedAt)],
+    limit,
+  });
+}
+
+export async function countDeletedIdeas(): Promise<number> {
+  const db = getDb();
+  const [row] = await db
+    .select({ value: count() })
+    .from(ideas)
+    .where(isNotNull(ideas.deletedAt));
+  return row?.value ?? 0;
 }

@@ -73,7 +73,11 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
       </section>
 
       <div className="mt-8">
-        <DeleteProjectButton id={project.id} name={project.name} />
+        <DeleteProjectButton
+          id={project.id}
+          name={project.name}
+          linkedCount={ideas.length}
+        />
       </div>
     </main>
   );

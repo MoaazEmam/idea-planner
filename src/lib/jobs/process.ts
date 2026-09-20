@@ -4,6 +4,7 @@ import { ideas, type Idea } from "@/db/schema";
 import { enrichLinked } from "@/lib/analysis/analyze-linked";
 import { enrichStandalone } from "@/lib/analysis/analyze-standalone";
 import type { StoredAnalysis } from "@/lib/analysis/schema";
+import { unsortedResetFields } from "@/lib/ideas";
 import { getProject, listProjects } from "@/lib/projects";
 import { routeIdea, type RoutingDecision } from "@/lib/routing/route-idea";
 import { ensureRun, finishRun, recordRunProgress } from "./runs";
@@ -450,25 +451,10 @@ export async function setIdeaUnsorted(
   ideaId: string,
 ): Promise<ManualRouteOutcome> {
   const db = getDb();
-  const now = new Date();
 
   const [updated] = await db
     .update(ideas)
-    .set({
-      analysisStatus: "routed",
-      analysisAttempts: 0,
-      analysis: null,
-      analysisRaw: null,
-      analysisError: null,
-      linkType: null,
-      linkSource: "manual",
-      linkConfidence: null,
-      projectId: null,
-      routedAt: now,
-      processedAt: null,
-      lockExpiresAt: null,
-      updatedAt: now,
-    })
+    .set(unsortedResetFields())
     .where(
       and(
         eq(ideas.id, ideaId),

@@ -36,11 +36,15 @@ export async function DELETE(
   context: RouteContext<"/api/projects/[id]">,
 ) {
   const { id } = await context.params;
-  const deleted = await deleteProject(id);
+  const result = await deleteProject(id);
 
-  if (!deleted) {
+  if (!result.deleted) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  return NextResponse.json({ id, deleted: true });
+  return NextResponse.json({
+    id,
+    deleted: true,
+    unlinked: result.unlinked,
+  });
 }

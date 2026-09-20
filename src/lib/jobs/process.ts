@@ -1,8 +1,10 @@
 import { count, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { ideas, type Idea } from "@/db/schema";
+import { enrichStandalone } from "@/lib/analysis/analyze-standalone";
+import type { StoredAnalysis } from "@/lib/analysis/schema";
 import { listProjects } from "@/lib/projects";
-import { routeIdea } from "@/lib/routing/route-idea";
+import { routeIdea, type RouteIdeaResult } from "@/lib/routing/route-idea";
 import { ensureRun, finishRun, recordRunProgress } from "./runs";
 
 const LOCK_MINUTES = 10;
@@ -71,10 +73,80 @@ async function claimNextIdea(): Promise<Idea | undefined> {
   return db.query.ideas.findFirst({ where: eq(ideas.id, id) });
 }
 
+/** Closes the run once the queue drains, and reports what is left. */
+async function finalize(runId: string): Promise<number> {
+  const remaining = await countClaimable();
+  if (remaining === 0) {
+    await finishRun(runId, "completed");
+  }
+  return remaining;
+}
+
+function routingFields(routing: RouteIdeaResult) {
+  return {
+    linkType: routing.decision.linkType,
+    linkSource: "auto" as const,
+    linkConfidence: routing.decision.confidence,
+    projectId: routing.decision.projectId,
+  };
+}
+
+/** Routing succeeded, but the idea is not a candidate for deep research. */
+async function markRouted(
+  ideaId: string,
+  routing: RouteIdeaResult,
+): Promise<void> {
+  const db = getDb();
+  await db
+    .update(ideas)
+    .set({
+      analysisStatus: "routed",
+      analysisAttempts: sql`${ideas.analysisAttempts} + 1`,
+      analysisRaw: routing.raw,
+      analysisError: null,
+      routedAt: new Date(),
+      lockExpiresAt: null,
+      updatedAt: new Date(),
+      ...routingFields(routing),
+    })
+    .where(eq(ideas.id, ideaId));
+}
+
+/** Routing plus a completed research analysis. */
+async function markEnriched(
+  ideaId: string,
+  routing: RouteIdeaResult,
+  analysis: StoredAnalysis,
+  raw: string,
+): Promise<void> {
+  const db = getDb();
+  const now = new Date();
+  await db
+    .update(ideas)
+    .set({
+      analysisStatus: "enriched",
+      analysisAttempts: sql`${ideas.analysisAttempts} + 1`,
+      analysis,
+      analysisRaw: raw,
+      analysisError: null,
+      routedAt: now,
+      processedAt: now,
+      lockExpiresAt: null,
+      updatedAt: now,
+      ...routingFields(routing),
+    })
+    .where(eq(ideas.id, ideaId));
+}
+
+/**
+ * Marks the idea for retry. When routing already succeeded we still store it so
+ * the UI keeps showing the link while the enrichment is retried next run.
+ */
 async function markFailed(
   ideaId: string,
   error: string,
   raw?: string,
+  routing?: RouteIdeaResult,
 ): Promise<void> {
   const db = getDb();
   await db
@@ -86,6 +158,7 @@ async function markFailed(
       analysisRaw: raw ?? null,
       lockExpiresAt: null,
       updatedAt: new Date(),
+      ...(routing ? routingFields(routing) : {}),
     })
     .where(eq(ideas.id, ideaId));
 }
@@ -123,49 +196,58 @@ export async function processNextIdea(
     if (routing.error) {
       await markFailed(idea.id, routing.error, routing.raw);
       await recordRunProgress(runId, { failed: 1 });
-      const remaining = await countClaimable();
-      if (remaining === 0) {
-        await finishRun(runId, "completed");
-      }
       return {
         skipped: false,
         processed: true,
-        remaining,
+        remaining: await finalize(runId),
         ideaId: idea.id,
         status: "failed",
         error: routing.error,
       };
     }
 
-    const db = getDb();
-    await db
-      .update(ideas)
-      .set({
-        analysisStatus: "routed",
-        analysisAttempts: sql`${ideas.analysisAttempts} + 1`,
-        linkType: routing.decision.linkType,
-        linkSource: "auto",
-        linkConfidence: routing.decision.confidence,
-        projectId: routing.decision.projectId,
-        analysisRaw: routing.raw,
-        analysisError: null,
-        routedAt: new Date(),
-        lockExpiresAt: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(ideas.id, idea.id));
+    // Standalone ideas are the ones worth spending research credits on. Linked
+    // and unsorted ideas stop at "routed" until a later phase.
+    if (routing.decision.status === "standalone") {
+      const enrichment = await enrichStandalone(idea.rawText);
 
-    await recordRunProgress(runId, { processed: 1 });
+      await recordRunProgress(runId, {
+        inputTokens: enrichment.usage.promptTokens,
+        outputTokens: enrichment.usage.completionTokens,
+        searches: enrichment.searches,
+      });
 
-    const remaining = await countClaimable();
-    if (remaining === 0) {
-      await finishRun(runId, "completed");
+      if (!enrichment.analysis) {
+        const message = enrichment.error ?? "enrichment produced no analysis";
+        await markFailed(idea.id, message, enrichment.raw, routing);
+        await recordRunProgress(runId, { failed: 1 });
+        return {
+          skipped: false,
+          processed: true,
+          remaining: await finalize(runId),
+          ideaId: idea.id,
+          status: "failed",
+          error: message,
+        };
+      }
+
+      await markEnriched(idea.id, routing, enrichment.analysis, enrichment.raw);
+      await recordRunProgress(runId, { processed: 1 });
+      return {
+        skipped: false,
+        processed: true,
+        remaining: await finalize(runId),
+        ideaId: idea.id,
+        status: "enriched",
+      };
     }
 
+    await markRouted(idea.id, routing);
+    await recordRunProgress(runId, { processed: 1 });
     return {
       skipped: false,
       processed: true,
-      remaining,
+      remaining: await finalize(runId),
       ideaId: idea.id,
       status: routing.decision.status,
     };
@@ -173,14 +255,10 @@ export async function processNextIdea(
     const message = error instanceof Error ? error.message : "processing failed";
     await markFailed(idea.id, message);
     await recordRunProgress(runId, { failed: 1 });
-    const remaining = await countClaimable();
-    if (remaining === 0) {
-      await finishRun(runId, "completed");
-    }
     return {
       skipped: false,
       processed: true,
-      remaining,
+      remaining: await finalize(runId),
       ideaId: idea.id,
       status: "failed",
       error: message,

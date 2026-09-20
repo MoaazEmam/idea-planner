@@ -12,9 +12,16 @@ export type ValidatedJsonResult<T> =
       data: T;
       raw: string;
       usage: CompletionUsage;
+      model: string;
       repaired: boolean;
     }
-  | { ok: false; raw: string; error: string; usage: CompletionUsage };
+  | {
+      ok: false;
+      raw: string;
+      error: string;
+      usage: CompletionUsage;
+      model: string;
+    };
 
 const EMPTY_USAGE: CompletionUsage = {
   promptTokens: 0,
@@ -75,6 +82,7 @@ export async function completeValidatedJson<T>(params: {
   let usage = EMPTY_USAGE;
   let lastRaw = "";
   let lastError = "no attempt made";
+  let lastModel = "";
   let repaired = false;
 
   for (let attempt = 0; attempt <= maxRepairs; attempt += 1) {
@@ -82,6 +90,7 @@ export async function completeValidatedJson<T>(params: {
     try {
       const completion = await completeJson(conversation, options);
       content = completion.content;
+      lastModel = completion.model;
       usage = addUsage(usage, completion.usage);
     } catch (error) {
       return {
@@ -89,13 +98,21 @@ export async function completeValidatedJson<T>(params: {
         raw: lastRaw,
         error: error instanceof Error ? error.message : "LLM request failed",
         usage,
+        model: lastModel,
       };
     }
 
     lastRaw = content;
     const parsed = parseAndValidate(schema, content);
     if (parsed.ok) {
-      return { ok: true, data: parsed.data, raw: content, usage, repaired };
+      return {
+        ok: true,
+        data: parsed.data,
+        raw: content,
+        usage,
+        model: lastModel,
+        repaired,
+      };
     }
 
     lastError = parsed.error;
@@ -113,5 +130,5 @@ export async function completeValidatedJson<T>(params: {
     }
   }
 
-  return { ok: false, raw: lastRaw, error: lastError, usage };
+  return { ok: false, raw: lastRaw, error: lastError, usage, model: lastModel };
 }

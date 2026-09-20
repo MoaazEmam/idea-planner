@@ -83,6 +83,7 @@ export const processingRuns = pgTable("processing_runs", {
   claimed: integer("claimed").notNull().default(0),
   processed: integer("processed").notNull().default(0),
   failed: integer("failed").notNull().default(0),
+  searches: integer("searches").notNull().default(0),
   inputTokens: integer("input_tokens").notNull().default(0),
   outputTokens: integer("output_tokens").notNull().default(0),
   error: text("error"),

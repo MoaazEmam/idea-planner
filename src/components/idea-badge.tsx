@@ -23,7 +23,10 @@ export function describeIdea(
   projectName: string | null,
 ): { label: string; tone: Tone } {
   if (idea.analysisStatus === "failed") {
-    return { label: "routing failed", tone: "red" };
+    return {
+      label: idea.linkType ? "research failed" : "routing failed",
+      tone: "red",
+    };
   }
   if (idea.analysisStatus === "processing") {
     return { label: "processing…", tone: "amber" };

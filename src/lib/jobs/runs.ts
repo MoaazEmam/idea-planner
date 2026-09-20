@@ -16,6 +16,7 @@ export async function recordRunProgress(
     claimed?: number;
     processed?: number;
     failed?: number;
+    searches?: number;
     inputTokens?: number;
     outputTokens?: number;
   },
@@ -27,6 +28,7 @@ export async function recordRunProgress(
       claimed: sql`${processingRuns.claimed} + ${delta.claimed ?? 0}`,
       processed: sql`${processingRuns.processed} + ${delta.processed ?? 0}`,
       failed: sql`${processingRuns.failed} + ${delta.failed ?? 0}`,
+      searches: sql`${processingRuns.searches} + ${delta.searches ?? 0}`,
       inputTokens: sql`${processingRuns.inputTokens} + ${delta.inputTokens ?? 0}`,
       outputTokens: sql`${processingRuns.outputTokens} + ${delta.outputTokens ?? 0}`,
     })

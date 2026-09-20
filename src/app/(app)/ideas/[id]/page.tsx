@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
+import { AnalysisView } from "./analysis-view";
 import { IdeaDetail } from "./idea-detail";
 import type { Idea } from "@/db/schema";
+import { parseStoredAnalysis } from "@/lib/analysis/schema";
 import { formatRelativeTime } from "@/lib/format";
 import { getIdea } from "@/lib/ideas";
 import { getProject } from "@/lib/projects";
@@ -36,6 +38,7 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
   }
 
   const project = idea.projectId ? await getProject(idea.projectId) : undefined;
+  const analysis = parseStoredAnalysis(idea.analysis);
 
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-8">
@@ -62,6 +65,12 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
           />
         ) : null}
         <Row label="Analysis" value={idea.analysisStatus} />
+        {idea.processedAt ? (
+          <Row
+            label="Researched"
+            value={formatRelativeTime(idea.processedAt)}
+          />
+        ) : null}
         {idea.analysisError ? (
           <Row
             label="Error"
@@ -69,6 +78,15 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
           />
         ) : null}
       </dl>
+
+      {analysis ? (
+        <section className="mt-8 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
+          <h2 className="mb-5 text-xs uppercase tracking-widest text-neutral-500">
+            Research
+          </h2>
+          <AnalysisView analysis={analysis} />
+        </section>
+      ) : null}
     </main>
   );
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "processing_runs" ADD COLUMN "searches" integer DEFAULT 0 NOT NULL;

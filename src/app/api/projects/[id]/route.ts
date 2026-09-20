@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { updateProject } from "@/lib/projects";
+import { deleteProject, updateProject } from "@/lib/projects";
 import { projectInputSchema } from "@/lib/validation/projects";
 
 export async function PATCH(
@@ -29,4 +29,18 @@ export async function PATCH(
   }
 
   return NextResponse.json({ id: project.id });
+}
+
+export async function DELETE(
+  _request: Request,
+  context: RouteContext<"/api/projects/[id]">,
+) {
+  const { id } = await context.params;
+  const deleted = await deleteProject(id);
+
+  if (!deleted) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ id, deleted: true });
 }

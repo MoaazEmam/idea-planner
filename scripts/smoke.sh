@@ -83,6 +83,43 @@ check "idea detail page loads" "200" "$(status -b "$COOKIE_JAR" "$APP_URL/ideas/
 check "unknown idea is 404" "404" "$(status -b "$COOKIE_JAR" "$APP_URL/ideas/00000000-0000-0000-0000-000000000000")"
 check "malformed id is 404, not 500" "404" "$(status -b "$COOKIE_JAR" "$APP_URL/ideas/not-a-uuid")"
 
+echo "projects"
+create_project=$(curl -s -m 10 -w '\n%{http_code}' -b "$COOKIE_JAR" -X POST "$APP_URL/api/projects" \
+  -H 'Content-Type: application/json' \
+  -d "{\"name\":\"Smoke $IDEMPOTENCY_KEY\",\"one_liner\":\"smoke project\",\"context\":\"smoke context\",\"status\":\"active\"}")
+check "create project 201" "201" "$(printf '%s' "$create_project" | tail -n1)"
+project_id=$(printf '%s' "$create_project" | sed '$d' | extract id)
+
+check "edit project 200" "200" "$(status -b "$COOKIE_JAR" -X PATCH "$APP_URL/api/projects/$project_id" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Smoke project renamed","one_liner":"smoke project","context":"smoke context v2","status":"paused"}')"
+projects_html=$(curl -s -m 10 -b "$COOKIE_JAR" "$APP_URL/projects")
+printf '%s' "$projects_html" | grep -q "Smoke project renamed" && check "project appears in list" ok ok || check "project appears in list" ok missing
+
+check "archive project 200" "200" "$(status -b "$COOKIE_JAR" -X PATCH "$APP_URL/api/projects/$project_id" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Smoke project renamed","one_liner":"smoke project","context":"smoke context v2","status":"paused","archived":true}')"
+projects_html=$(curl -s -m 10 -b "$COOKIE_JAR" "$APP_URL/projects")
+if printf '%s' "$projects_html" | grep -q "Smoke project renamed"; then
+  check "archived project hidden by default" hidden shown
+else
+  check "archived project hidden by default" ok ok
+fi
+
+echo "idea edit and delete"
+edited_idea=$(curl -s -m 10 -w '\n%{http_code}' -b "$COOKIE_JAR" -X POST "$APP_URL/api/ideas" \
+  -H 'Content-Type: application/json' \
+  -d "{\"raw_text\":\"editable idea $IDEMPOTENCY_KEY\"}")
+edited_id=$(printf '%s' "$edited_idea" | sed '$d' | extract id)
+check "edit idea 200" "200" "$(status -b "$COOKIE_JAR" -X PATCH "$APP_URL/api/ideas/$edited_id" \
+  -H 'Content-Type: application/json' -d '{"raw_text":"edited idea text"}')"
+idea_html=$(curl -s -m 10 -b "$COOKIE_JAR" "$APP_URL/ideas/$edited_id")
+printf '%s' "$idea_html" | grep -q "edited idea text" && check "idea edit visible" ok ok || check "idea edit visible" ok missing
+check "delete idea 200" "200" "$(status -b "$COOKIE_JAR" -X DELETE "$APP_URL/api/ideas/$edited_id")"
+check "deleted idea is 404" "404" "$(status -b "$COOKIE_JAR" "$APP_URL/ideas/$edited_id")"
+
+check "delete project 200" "200" "$(status -b "$COOKIE_JAR" -X DELETE "$APP_URL/api/projects/$project_id")"
+
 rm -f "$COOKIE_JAR"
 
 echo

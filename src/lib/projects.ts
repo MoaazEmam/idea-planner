@@ -64,3 +64,15 @@ export async function updateProject(
 
   return updated;
 }
+
+export async function deleteProject(id: string): Promise<boolean> {
+  if (!isUuid(id)) {
+    return false;
+  }
+  const db = getDb();
+  const [deleted] = await db
+    .delete(projects)
+    .where(eq(projects.id, id))
+    .returning({ id: projects.id });
+  return Boolean(deleted);
+}

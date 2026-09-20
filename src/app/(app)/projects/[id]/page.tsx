@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DeleteProjectButton } from "./delete-project-button";
 import { ProjectForm } from "../project-form";
 import { formatRelativeTime } from "@/lib/format";
 import { getProject } from "@/lib/projects";
@@ -32,6 +33,10 @@ export default async function ProjectPage(props: PageProps<"/projects/[id]">) {
 
       <div className="mt-6 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
         <ProjectForm mode="edit" project={project} />
+      </div>
+
+      <div className="mt-8">
+        <DeleteProjectButton id={project.id} name={project.name} />
       </div>
     </main>
   );

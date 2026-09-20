@@ -37,18 +37,82 @@ function addUsage(a: CompletionUsage, b: CompletionUsage): CompletionUsage {
   };
 }
 
+/**
+ * Extracts the first complete JSON value from a string. `json_object` mode
+ * usually returns clean JSON, but thinking models sometimes wrap it in a code
+ * fence or append prose; recovering it beats burning a run.
+ */
+export function extractJsonValue(raw: string): string | null {
+  const trimmed = raw
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/, "")
+    .trim();
+
+  const start = trimmed.search(/[{[]/);
+  if (start === -1) {
+    return null;
+  }
+
+  const open = trimmed[start];
+  const close = open === "{" ? "}" : "]";
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < trimmed.length; index += 1) {
+    const char = trimmed[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+    } else if (char === open) {
+      depth += 1;
+    } else if (char === close) {
+      depth -= 1;
+      if (depth === 0) {
+        return trimmed.slice(start, index + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
 function parseAndValidate<T>(
   schema: z.ZodType<T>,
   raw: string,
 ): { ok: true; data: T } | { ok: false; error: string } {
+  const extracted = extractJsonValue(raw);
+  const candidates =
+    extracted && extracted !== raw ? [raw, extracted] : [raw];
+
   let json: unknown;
-  try {
-    json = JSON.parse(raw);
-  } catch (error) {
-    return {
-      ok: false,
-      error: `invalid JSON: ${error instanceof Error ? error.message : "parse error"}`,
-    };
+  let parsed = false;
+  let parseError = "parse error";
+
+  for (const candidate of candidates) {
+    try {
+      json = JSON.parse(candidate);
+      parsed = true;
+      break;
+    } catch (error) {
+      parseError = error instanceof Error ? error.message : "parse error";
+    }
+  }
+
+  if (!parsed) {
+    return { ok: false, error: `invalid JSON: ${parseError}` };
   }
 
   const result = schema.safeParse(json);

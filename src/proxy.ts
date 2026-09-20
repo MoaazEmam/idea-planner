@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   SESSION_COOKIE,
   hasValidIngestToken,
+  hasValidWorkerToken,
   verifySessionToken,
 } from "@/lib/auth";
 
@@ -28,6 +29,11 @@ export async function proxy(request: NextRequest) {
 
   // Machine capture (Apple Shortcut): bearer token instead of a cookie.
   if (pathname === "/api/ideas" && hasValidIngestToken(request)) {
+    return NextResponse.next();
+  }
+
+  // Nightly enrichment worker: bearer token instead of a cookie.
+  if (pathname.startsWith("/api/process") && hasValidWorkerToken(request)) {
     return NextResponse.next();
   }
 

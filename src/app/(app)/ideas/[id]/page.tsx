@@ -1,10 +1,31 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { IdeaDetail } from "./idea-detail";
+import type { Idea } from "@/db/schema";
 import { formatRelativeTime } from "@/lib/format";
 import { getIdea } from "@/lib/ideas";
+import { getProject } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
+
+function routingLabel(idea: Idea, projectName: string | null): string {
+  if (idea.analysisStatus === "new") return "Not routed yet";
+  if (idea.linkType === "standalone") return "Standalone";
+  if (idea.linkType && projectName) return `${idea.linkType} → ${projectName}`;
+  if (idea.linkType) return idea.linkType;
+  if (idea.analysisStatus === "failed") return "Routing failed";
+  return "Unsorted";
+}
+
+function Row({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex justify-between gap-4">
+      <dt>{label}</dt>
+      <dd className="text-right">{value}</dd>
+    </div>
+  );
+}
 
 export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
   const { id } = await props.params;
@@ -13,6 +34,8 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
   if (!idea) {
     notFound();
   }
+
+  const project = idea.projectId ? await getProject(idea.projectId) : undefined;
 
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-8">
@@ -28,18 +51,23 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
       </div>
 
       <dl className="mt-8 space-y-2 text-sm text-neutral-500">
-        <div className="flex justify-between gap-4">
-          <dt>Captured</dt>
-          <dd>{formatRelativeTime(idea.createdAt)}</dd>
-        </div>
-        <div className="flex justify-between gap-4">
-          <dt>Updated</dt>
-          <dd>{formatRelativeTime(idea.updatedAt)}</dd>
-        </div>
-        <div className="flex justify-between gap-4">
-          <dt>Status</dt>
-          <dd>{idea.status}</dd>
-        </div>
+        <Row label="Captured" value={formatRelativeTime(idea.createdAt)} />
+        <Row label="Routing" value={routingLabel(idea, project?.name ?? null)} />
+        {idea.analysisStatus !== "new" && idea.linkConfidence !== null ? (
+          <Row
+            label="Confidence"
+            value={`${Math.round(idea.linkConfidence * 100)}%${
+              idea.linkSource ? ` · ${idea.linkSource}` : ""
+            }`}
+          />
+        ) : null}
+        <Row label="Analysis" value={idea.analysisStatus} />
+        {idea.analysisError ? (
+          <Row
+            label="Error"
+            value={<span className="text-red-400">{idea.analysisError}</span>}
+          />
+        ) : null}
       </dl>
     </main>
   );

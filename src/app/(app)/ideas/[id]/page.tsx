@@ -4,11 +4,12 @@ import type { ReactNode } from "react";
 import { AnalysisView } from "./analysis-view";
 import { IdeaDetail } from "./idea-detail";
 import { LinkedAnalysisView } from "./linked-analysis-view";
+import { RoutingControls } from "./routing-controls";
 import type { Idea } from "@/db/schema";
 import { parseStoredAnalysis } from "@/lib/analysis/schema";
 import { formatRelativeTime } from "@/lib/format";
 import { getIdea } from "@/lib/ideas";
-import { getProject } from "@/lib/projects";
+import { getProject, listProjects } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
 
   const project = idea.projectId ? await getProject(idea.projectId) : undefined;
   const analysis = parseStoredAnalysis(idea.analysis);
+  const projects = await listProjects();
 
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-8">
@@ -79,6 +81,21 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
           />
         ) : null}
       </dl>
+
+      <section className="mt-8 space-y-3">
+        <h2 className="text-xs uppercase tracking-widest text-neutral-500">
+          Sort
+        </h2>
+        <RoutingControls
+          ideaId={idea.id}
+          projectId={idea.projectId}
+          linkType={idea.linkType}
+          projects={projects.map((candidate) => ({
+            id: candidate.id,
+            name: candidate.name,
+          }))}
+        />
+      </section>
 
       {analysis ? (
         <section className="mt-8 rounded-xl border border-neutral-800 bg-neutral-900 p-5">

@@ -7,6 +7,8 @@ a standalone product with scores and sources.
 
 It is a single-user app: one shared passphrase, one database, no accounts.
 
+> Shipped work, known issues, and the remaining backlog: [`docs/STATUS.md`](docs/STATUS.md).
+
 ## How it works
 
 ```

@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { ideas, type Idea } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
@@ -51,6 +51,7 @@ export async function createIdea(
 export async function listIdeas(limit = 100): Promise<Idea[]> {
   const db = getDb();
   return db.query.ideas.findMany({
+    where: isNull(ideas.deletedAt),
     orderBy: [desc(ideas.createdAt)],
     limit,
   });
@@ -62,6 +63,6 @@ export async function getIdea(id: string): Promise<Idea | undefined> {
   }
   const db = getDb();
   return db.query.ideas.findFirst({
-    where: eq(ideas.id, id),
+    where: and(eq(ideas.id, id), isNull(ideas.deletedAt)),
   });
 }

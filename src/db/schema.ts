@@ -1,14 +1,16 @@
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /**
- * Phase 1 keeps the schema intentionally thin: capture and read back only.
- * Enrichment columns (analysis, routing, link metadata) arrive in Phase 3+.
+ * Projects are the things ideas can be linked to. `context` is the field the
+ * project-linked analysis prompt reads, so it is deliberately free-form.
  */
-export const ideas = pgTable("ideas", {
+export const projects = pgTable("projects", {
   id: uuid("id").primaryKey().defaultRandom(),
-  rawText: text("raw_text").notNull(),
-  status: text("status").notNull().default("inbox"),
-  captureKey: text("capture_key").unique(),
+  name: text("name").notNull(),
+  oneLiner: text("one_liner"),
+  context: text("context"),
+  status: text("status").notNull().default("active"),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -17,5 +19,24 @@ export const ideas = pgTable("ideas", {
     .defaultNow(),
 });
 
+/**
+ * Enrichment columns (analysis, routing, link metadata) arrive in Phase 3+.
+ */
+export const ideas = pgTable("ideas", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  rawText: text("raw_text").notNull(),
+  status: text("status").notNull().default("inbox"),
+  captureKey: text("capture_key").unique(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
 export type Idea = typeof ideas.$inferSelect;
 export type NewIdea = typeof ideas.$inferInsert;

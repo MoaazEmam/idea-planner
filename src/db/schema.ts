@@ -39,13 +39,11 @@ export const ideas = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     rawText: text("raw_text").notNull(),
-    status: text("status").notNull().default("inbox"),
     captureKey: text("capture_key").unique(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
 
     analysisStatus: text("analysis_status").notNull().default("new"),
     analysisAttempts: integer("analysis_attempts").notNull().default(0),
-    analysisVersion: integer("analysis_version").notNull().default(1),
 
     linkType: text("link_type"),
     linkSource: text("link_source"),

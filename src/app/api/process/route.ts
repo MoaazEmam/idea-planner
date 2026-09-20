@@ -31,6 +31,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ runId, finished: true });
   }
 
-  const outcome = await processNextIdea(runId, trigger);
-  return NextResponse.json({ runId, enabled: processingEnabled(), ...outcome });
+  try {
+    const outcome = await processNextIdea(runId, trigger);
+    return NextResponse.json({ runId, enabled: processingEnabled(), ...outcome });
+  } catch (error) {
+    // Anything that escapes the per-idea handling is a run-level failure; keep
+    // the reason on the run so /runs can explain it.
+    const message = error instanceof Error ? error.message : "processing failed";
+    await finishRun(runId, "failed", message);
+    return NextResponse.json(
+      { runId, error: "processing_failed", message },
+      { status: 500 },
+    );
+  }
 }

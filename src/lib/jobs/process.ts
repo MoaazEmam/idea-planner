@@ -7,7 +7,7 @@ import type { StoredAnalysis } from "@/lib/analysis/schema";
 import { unsortedResetFields } from "@/lib/ideas";
 import { getProject, listProjects } from "@/lib/projects";
 import { routeIdea, type RoutingDecision } from "@/lib/routing/route-idea";
-import { ensureRun, finishRun, recordRunProgress } from "./runs";
+import { ensureRun, finishRun, getRun, recordRunProgress } from "./runs";
 
 const LOCK_MINUTES = 10;
 const MAX_ATTEMPTS = 3;
@@ -40,6 +40,20 @@ export type ManualRouteOutcome = ReanalyzeOutcome;
 
 export function processingEnabled(): boolean {
   return process.env.PROCESSING_ENABLED !== "false";
+}
+
+/**
+ * Optional ceiling on ideas handled within one run. The nightly workflow caps
+ * its own loop too; this is defence in depth so a runaway caller cannot keep
+ * spending on the same run id.
+ */
+function maxIdeasPerRun(): number | null {
+  const raw = process.env.MAX_IDEAS_PER_RUN;
+  if (!raw) {
+    return null;
+  }
+  const value = Number.parseInt(raw, 10);
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
 /**
@@ -352,6 +366,18 @@ export async function processNextIdea(
   }
 
   await ensureRun(runId, trigger);
+
+  const cap = maxIdeasPerRun();
+  if (cap !== null) {
+    const run = await getRun(runId);
+    if (run && run.processed + run.failed >= cap) {
+      return {
+        skipped: true,
+        reason: "run limit reached",
+        remaining: await countClaimable(),
+      };
+    }
+  }
 
   const idea = await claimNextIdea();
   if (!idea) {

@@ -47,6 +47,13 @@ export async function finishRun(
     .where(eq(processingRuns.id, runId));
 }
 
+export async function getRun(runId: string): Promise<ProcessingRun | undefined> {
+  const db = getDb();
+  return db.query.processingRuns.findFirst({
+    where: eq(processingRuns.id, runId),
+  });
+}
+
 export async function getLatestRun(): Promise<ProcessingRun | undefined> {
   const db = getDb();
   return db.query.processingRuns.findFirst({

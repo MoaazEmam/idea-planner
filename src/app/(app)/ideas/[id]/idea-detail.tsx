@@ -3,13 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Idea } from "@/db/schema";
+import { isAnalysisStale } from "@/lib/analysis/state";
 
 export function IdeaDetail({ idea }: { idea: Idea }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(idea.rawText);
   const [busy, setBusy] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const stale = isAnalysisStale(idea);
 
   async function save() {
     const value = text.trim();
@@ -57,6 +60,32 @@ export function IdeaDetail({ idea }: { idea: Idea }) {
     } catch {
       setError("Could not delete.");
       setBusy(false);
+    }
+  }
+
+  async function reanalyze() {
+    if (busy || analyzing) {
+      return;
+    }
+    setAnalyzing(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/ideas/${idea.id}/reanalyze`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(
+          payload?.message ?? `Request failed (${response.status})`,
+        );
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not re-analyze.");
+    } finally {
+      setAnalyzing(false);
     }
   }
 
@@ -111,14 +140,31 @@ export function IdeaDetail({ idea }: { idea: Idea }) {
             Edit
           </button>
         )}
+        {editing ? null : (
+          <button
+            type="button"
+            onClick={reanalyze}
+            disabled={busy || analyzing}
+            className="text-neutral-400 transition hover:text-neutral-100 disabled:opacity-40"
+          >
+            {analyzing
+              ? "Analyzing…"
+              : idea.analysisStatus === "new"
+                ? "Analyze now"
+                : "Re-analyze"}
+          </button>
+        )}
         <button
           type="button"
           onClick={remove}
-          disabled={busy}
+          disabled={busy || analyzing}
           className="text-neutral-500 transition hover:text-red-400 disabled:opacity-40"
         >
           Delete
         </button>
+        {stale && !analyzing ? (
+          <span className="text-amber-400">Edited since last analysis</span>
+        ) : null}
         {error ? <span className="text-red-400">{error}</span> : null}
       </div>
     </div>

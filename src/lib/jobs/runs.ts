@@ -53,3 +53,11 @@ export async function getLatestRun(): Promise<ProcessingRun | undefined> {
     orderBy: (runs, { desc }) => [desc(runs.startedAt)],
   });
 }
+
+export async function listRuns(limit = 20): Promise<ProcessingRun[]> {
+  const db = getDb();
+  return db.query.processingRuns.findMany({
+    orderBy: (runs, { desc }) => [desc(runs.startedAt)],
+    limit,
+  });
+}

@@ -14,6 +14,9 @@ export function SiteHeader() {
           <Link href="/projects" className="transition hover:text-neutral-100">
             Projects
           </Link>
+          <Link href="/runs" className="transition hover:text-neutral-100">
+            Runs
+          </Link>
           <form action="/api/logout" method="post">
             <button
               type="submit"

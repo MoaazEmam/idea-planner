@@ -107,10 +107,10 @@ else
 fi
 
 echo "idea edit and delete"
-edited_idea=$(curl -s -m 10 -w '\n%{http_code}' -b "$COOKIE_JAR" -X POST "$APP_URL/api/ideas" \
+edited_id=$(printf '%s' "$(curl -s -m 10 -b "$COOKIE_JAR" -X POST "$APP_URL/api/ideas" \
   -H 'Content-Type: application/json' \
-  -d "{\"raw_text\":\"editable idea $IDEMPOTENCY_KEY\"}")
-edited_id=$(printf '%s' "$edited_idea" | sed '$d' | extract id)
+  -H "Idempotency-Key: smoke-edit-$IDEMPOTENCY_KEY" \
+  -d "{\"raw_text\":\"editable idea $IDEMPOTENCY_KEY\"}")" | extract id)
 check "edit idea 200" "200" "$(status -b "$COOKIE_JAR" -X PATCH "$APP_URL/api/ideas/$edited_id" \
   -H 'Content-Type: application/json' -d '{"raw_text":"edited idea text"}')"
 idea_html=$(curl -s -m 10 -b "$COOKIE_JAR" "$APP_URL/ideas/$edited_id")

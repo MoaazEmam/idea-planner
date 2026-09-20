@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { ideas, type Idea } from "@/db/schema";
+import { ideas, projects, type Idea } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
 
 export type CreateIdeaResult = {
@@ -48,13 +48,20 @@ export async function createIdea(
   return { idea: existing, created: false };
 }
 
-export async function listIdeas(limit = 100): Promise<Idea[]> {
+export type IdeaListItem = Idea & { projectName: string | null };
+
+/** Inbox feed. Joins the project name so the list can show where each idea went. */
+export async function listIdeas(limit = 100): Promise<IdeaListItem[]> {
   const db = getDb();
-  return db.query.ideas.findMany({
-    where: isNull(ideas.deletedAt),
-    orderBy: [desc(ideas.createdAt)],
-    limit,
-  });
+  const rows = await db
+    .select({ idea: ideas, projectName: projects.name })
+    .from(ideas)
+    .leftJoin(projects, eq(ideas.projectId, projects.id))
+    .where(isNull(ideas.deletedAt))
+    .orderBy(desc(ideas.createdAt))
+    .limit(limit);
+
+  return rows.map((row) => ({ ...row.idea, projectName: row.projectName }));
 }
 
 export async function getIdea(id: string): Promise<Idea | undefined> {

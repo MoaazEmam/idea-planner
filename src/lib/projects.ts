@@ -1,6 +1,6 @@
-import { asc, eq, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { projects, type Project } from "@/db/schema";
+import { ideas, projects, type Idea, type Project } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
 import type { ProjectInput } from "@/lib/validation/projects";
 
@@ -75,4 +75,38 @@ export async function deleteProject(id: string): Promise<boolean> {
     .where(eq(projects.id, id))
     .returning({ id: projects.id });
   return Boolean(deleted);
+}
+
+/** Ideas currently linked to a project, newest first. */
+export async function listProjectIdeas(
+  projectId: string,
+  limit = 100,
+): Promise<Idea[]> {
+  if (!isUuid(projectId)) {
+    return [];
+  }
+  const db = getDb();
+  return db.query.ideas.findMany({
+    where: and(eq(ideas.projectId, projectId), isNull(ideas.deletedAt)),
+    orderBy: [desc(ideas.createdAt)],
+    limit,
+  });
+}
+
+/** Tagged-idea count per project id, for the projects list. */
+export async function countsByProject(): Promise<Map<string, number>> {
+  const db = getDb();
+  const rows = await db
+    .select({ projectId: ideas.projectId, value: count() })
+    .from(ideas)
+    .where(and(isNull(ideas.deletedAt), isNotNull(ideas.projectId)))
+    .groupBy(ideas.projectId);
+
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (row.projectId) {
+      counts.set(row.projectId, row.value);
+    }
+  }
+  return counts;
 }

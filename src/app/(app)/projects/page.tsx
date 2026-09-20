@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ProjectForm } from "./project-form";
-import { listProjects } from "@/lib/projects";
+import { countsByProject, listProjects } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +8,7 @@ export default async function ProjectsPage(props: PageProps<"/projects">) {
   const { archived } = await props.searchParams;
   const showArchived = archived === "1";
   const projects = await listProjects({ includeArchived: showArchived });
+  const counts = await countsByProject();
 
   return (
     <main className="mx-auto w-full max-w-2xl space-y-10 px-5 py-8">
@@ -49,6 +50,7 @@ export default async function ProjectsPage(props: PageProps<"/projects">) {
                       {project.name}
                     </p>
                     <span className="shrink-0 text-xs text-neutral-500">
+                      {counts.get(project.id) ?? 0} ideas ·{" "}
                       {project.archivedAt ? "archived" : project.status}
                     </span>
                   </div>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CaptureForm } from "./capture-form";
+import { IdeaBadge } from "@/components/idea-badge";
 import { formatRelativeTime } from "@/lib/format";
 import { listIdeas } from "@/lib/ideas";
 
@@ -27,9 +28,12 @@ export default async function HomePage() {
                   href={`/ideas/${idea.id}`}
                   className="block rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-3 transition hover:border-neutral-700"
                 >
-                  <p className="line-clamp-2 text-neutral-100">
-                    {idea.rawText}
-                  </p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="line-clamp-2 text-neutral-100">
+                      {idea.rawText}
+                    </p>
+                    <IdeaBadge idea={idea} projectName={idea.projectName} />
+                  </div>
                   <p className="mt-1 text-xs text-neutral-500">
                     {formatRelativeTime(idea.createdAt)}
                   </p>

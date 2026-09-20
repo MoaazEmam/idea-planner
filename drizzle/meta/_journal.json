@@ -15,6 +15,13 @@
       "when": 1789872762098,
       "tag": "0001_gigantic_the_hood",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789874132409,
+      "tag": "0002_fine_living_tribunal",
+      "breakpoints": true
     }
   ]
 }

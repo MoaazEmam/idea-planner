@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { IdeaDetail } from "./idea-detail";
 import { formatRelativeTime } from "@/lib/format";
 import { getIdea } from "@/lib/ideas";
 
@@ -19,19 +20,21 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
         href="/"
         className="text-sm text-neutral-500 transition hover:text-neutral-300"
       >
-        ← Back
+        ← Inbox
       </Link>
 
-      <article className="mt-6 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
-        <p className="whitespace-pre-wrap text-base leading-relaxed text-neutral-100">
-          {idea.rawText}
-        </p>
-      </article>
+      <div className="mt-6">
+        <IdeaDetail idea={idea} />
+      </div>
 
-      <dl className="mt-6 space-y-2 text-sm text-neutral-500">
+      <dl className="mt-8 space-y-2 text-sm text-neutral-500">
         <div className="flex justify-between gap-4">
           <dt>Captured</dt>
           <dd>{formatRelativeTime(idea.createdAt)}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt>Updated</dt>
+          <dd>{formatRelativeTime(idea.updatedAt)}</dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt>Status</dt>

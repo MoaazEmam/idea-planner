@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
-import type { StoredAnalysis } from "@/lib/analysis/schema";
+import type { StandaloneStoredAnalysis } from "@/lib/analysis/schema";
 
-const SCORE_LABELS: Record<keyof StoredAnalysis["scores"], string> = {
+const SCORE_LABELS: Record<
+  keyof StandaloneStoredAnalysis["scores"],
+  string
+> = {
   market: "Market",
   differentiation: "Differentiation",
   feasibility: "Feasibility",
@@ -26,8 +29,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function AnalysisView({ analysis }: { analysis: StoredAnalysis }) {
-  const scoreKeys = Object.keys(SCORE_LABELS) as (keyof StoredAnalysis["scores"])[];
+export function AnalysisView({ analysis }: { analysis: StandaloneStoredAnalysis }) {
+  const scoreKeys = Object.keys(SCORE_LABELS) as (keyof StandaloneStoredAnalysis["scores"])[];
 
   return (
     <div className="space-y-6">

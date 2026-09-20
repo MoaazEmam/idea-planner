@@ -1,9 +1,10 @@
 import { count, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { ideas, type Idea } from "@/db/schema";
+import { enrichLinked } from "@/lib/analysis/analyze-linked";
 import { enrichStandalone } from "@/lib/analysis/analyze-standalone";
 import type { StoredAnalysis } from "@/lib/analysis/schema";
-import { listProjects } from "@/lib/projects";
+import { getProject, listProjects } from "@/lib/projects";
 import { routeIdea, type RouteIdeaResult } from "@/lib/routing/route-idea";
 import { ensureRun, finishRun, recordRunProgress } from "./runs";
 
@@ -25,12 +26,19 @@ export function processingEnabled(): boolean {
   return process.env.PROCESSING_ENABLED !== "false";
 }
 
-/** Mirrors the claim predicate so "remaining" and "claimable" never diverge. */
+/**
+ * Mirrors the claim predicate so "remaining" and "claimable" never diverge.
+ * A routed idea that is linked to a project still needs its analysis, so it
+ * stays claimable until it reaches "enriched". Unsorted stays parked.
+ */
 function claimableCondition() {
   return sql`${ideas.deletedAt} IS NULL
     AND ${ideas.analysisAttempts} < ${MAX_ATTEMPTS}
-    AND ${ideas.analysisStatus} IN ('new', 'failed')
-    AND (${ideas.lockExpiresAt} IS NULL OR ${ideas.lockExpiresAt} < now())`;
+    AND (${ideas.lockExpiresAt} IS NULL OR ${ideas.lockExpiresAt} < now())
+    AND (
+      ${ideas.analysisStatus} IN ('new', 'failed')
+      OR (${ideas.analysisStatus} = 'routed' AND ${ideas.projectId} IS NOT NULL)
+    )`;
 }
 
 async function countClaimable(): Promise<number> {
@@ -206,8 +214,8 @@ export async function processNextIdea(
       };
     }
 
-    // Standalone ideas are the ones worth spending research credits on. Linked
-    // and unsorted ideas stop at "routed" until a later phase.
+    // Standalone ideas get web research. Linked ideas get a project-context
+    // analysis. Unsorted ideas stop at "routed" until the user sorts them.
     if (routing.decision.status === "standalone") {
       const enrichment = await enrichStandalone(idea.rawText);
 
@@ -215,6 +223,51 @@ export async function processNextIdea(
         inputTokens: enrichment.usage.promptTokens,
         outputTokens: enrichment.usage.completionTokens,
         searches: enrichment.searches,
+      });
+
+      if (!enrichment.analysis) {
+        const message = enrichment.error ?? "enrichment produced no analysis";
+        await markFailed(idea.id, message, enrichment.raw, routing);
+        await recordRunProgress(runId, { failed: 1 });
+        return {
+          skipped: false,
+          processed: true,
+          remaining: await finalize(runId),
+          ideaId: idea.id,
+          status: "failed",
+          error: message,
+        };
+      }
+
+      await markEnriched(idea.id, routing, enrichment.analysis, enrichment.raw);
+      await recordRunProgress(runId, { processed: 1 });
+      return {
+        skipped: false,
+        processed: true,
+        remaining: await finalize(runId),
+        ideaId: idea.id,
+        status: "enriched",
+      };
+    }
+
+    if (routing.decision.status === "linked") {
+      const project =
+        projects.find(
+          (candidate) => candidate.id === routing.decision.projectId,
+        ) ?? (await getProject(routing.decision.projectId));
+      if (!project) {
+        throw new Error("routed to a project that no longer exists");
+      }
+
+      const enrichment = await enrichLinked(idea.rawText, project, {
+        linkType: routing.decision.linkType,
+        confidence: routing.decision.confidence,
+        reasoning: routing.decision.reasoning,
+      });
+
+      await recordRunProgress(runId, {
+        inputTokens: enrichment.usage.promptTokens,
+        outputTokens: enrichment.usage.completionTokens,
       });
 
       if (!enrichment.analysis) {

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { AnalysisView } from "./analysis-view";
 import { IdeaDetail } from "./idea-detail";
+import { LinkedAnalysisView } from "./linked-analysis-view";
 import type { Idea } from "@/db/schema";
 import { parseStoredAnalysis } from "@/lib/analysis/schema";
 import { formatRelativeTime } from "@/lib/format";
@@ -82,9 +83,13 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
       {analysis ? (
         <section className="mt-8 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
           <h2 className="mb-5 text-xs uppercase tracking-widest text-neutral-500">
-            Research
+            {analysis.kind === "standalone" ? "Research" : "Project analysis"}
           </h2>
-          <AnalysisView analysis={analysis} />
+          {analysis.kind === "standalone" ? (
+            <AnalysisView analysis={analysis} />
+          ) : (
+            <LinkedAnalysisView analysis={analysis} />
+          )}
         </section>
       ) : null}
     </main>

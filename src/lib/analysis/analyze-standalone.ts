@@ -3,9 +3,9 @@ import { completeValidatedJson } from "@/lib/llm/validate";
 import { searchMany, type ResearchResult } from "@/lib/research/tavily";
 import { generateSearchQueries } from "./queries";
 import {
-  ANALYSIS_PROMPT_VERSION,
+  STANDALONE_PROMPT_VERSION,
   standaloneAnalysisSchema,
-  type StoredAnalysis,
+  type StandaloneStoredAnalysis,
 } from "./schema";
 
 /** Sources are ranked and truncated: the model sees a bounded, high-signal set. */
@@ -14,7 +14,7 @@ const MAX_SNIPPET_CHARS = 900;
 const IDEAS_MAX_QUERY_CHARS = 160;
 
 export type StandaloneEnrichmentResult = {
-  analysis: StoredAnalysis | null;
+  analysis: StandaloneStoredAnalysis | null;
   raw: string;
   usage: CompletionUsage;
   searches: number;
@@ -34,6 +34,8 @@ Scoring (integer 1..10, each with a one-sentence reason):
 - differentiation: how hard this is to copy and how crowded the space is
 - feasibility: how achievable this is for one person building with AI tooling
 - monetization: how plausibly and how soon it makes money
+
+Scores are whole numbers from 1 to 10 (no decimals, no percentages, no 0..1 probability).
 
 Style: specific and direct. No hype, no filler, no restating the idea.`;
 
@@ -142,7 +144,7 @@ export async function enrichStandalone(
     analysis: {
       ...analysisResult.data,
       kind: "standalone",
-      promptVersion: ANALYSIS_PROMPT_VERSION,
+      promptVersion: STANDALONE_PROMPT_VERSION,
       model: analysisResult.model,
       generatedAt: new Date().toISOString(),
       searchQueries: queries,

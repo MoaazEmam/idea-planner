@@ -1,6 +1,14 @@
 # Project status
 
-_Updated 2026-09-21 · `main` at `468a937` · production: https://idea-planner-moaaz12.vercel.app_
+_Updated 2026-09-21 · production: https://idea-planner-moaaz12.vercel.app_
+
+> **Production incident 2026-09-21 (resolved):** the DB-backed app hung while
+> the database stayed healthy. A single shared connection (`max: 1`, cached on
+> `globalThis`) could be left wedged in `ClientRead`, and every later request on
+> that instance queued behind it. The connection pool is now bounded and
+> self-healing; root cause, evidence, and the fix are in
+> [`INCIDENT-2026-09-21-db-wedge.md`](INCIDENT-2026-09-21-db-wedge.md).
+
 
 A snapshot of what is shipped, what is verified, and what is left. Setup,
 architecture, and the env reference live in the [`README`](../README.md).

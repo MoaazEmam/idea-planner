@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { BUTTON_PRIMARY } from "@/components/button";
 
 export function CaptureForm() {
   const router = useRouter();
@@ -66,7 +67,7 @@ export function CaptureForm() {
         <button
           type="submit"
           disabled={saving || text.trim().length === 0}
-          className="rounded-lg bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+          className={BUTTON_PRIMARY}
         >
           {saving ? "Saving…" : "Capture"}
         </button>

@@ -2,10 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { AnalysisView } from "./analysis-view";
+import { IdeaAdditions } from "./idea-additions";
 import { IdeaDetail } from "./idea-detail";
 import { LinkedAnalysisView } from "./linked-analysis-view";
+import { PromoteIdeaForm } from "./promote-idea-form";
 import { RoutingControls } from "./routing-controls";
 import type { Idea } from "@/db/schema";
+import { listAdditions } from "@/lib/additions";
+import { buildPromotedProject } from "@/lib/analysis/promote";
 import { parseStoredAnalysis } from "@/lib/analysis/schema";
 import { formatRelativeTime } from "@/lib/format";
 import { getIdea } from "@/lib/ideas";
@@ -41,7 +45,12 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
 
   const project = idea.projectId ? await getProject(idea.projectId) : undefined;
   const analysis = parseStoredAnalysis(idea.analysis);
-  const projects = await listProjects();
+  const [projects, additions] = await Promise.all([
+    listProjects(),
+    listAdditions(idea.id),
+  ]);
+  const clarificationTexts = additions.map((addition) => addition.text);
+  const promoteDefaults = buildPromotedProject(idea.rawText, analysis);
 
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-8">
@@ -53,7 +62,7 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
       </Link>
 
       <div className="mt-6">
-        <IdeaDetail idea={idea} />
+        <IdeaDetail idea={idea} additions={clarificationTexts} />
       </div>
 
       <dl className="mt-8 space-y-2 text-sm text-neutral-500">
@@ -82,6 +91,10 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
         ) : null}
       </dl>
 
+      <section className="mt-8">
+        <IdeaAdditions ideaId={idea.id} additions={additions} />
+      </section>
+
       <section className="mt-8 space-y-3">
         <h2 className="text-xs uppercase tracking-widest text-neutral-500">
           Sort
@@ -96,6 +109,19 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
           }))}
         />
       </section>
+
+      {idea.projectId ? null : (
+        <section className="mt-8 space-y-3">
+          <h2 className="text-xs uppercase tracking-widest text-neutral-500">
+            Promote
+          </h2>
+          <p className="text-sm text-neutral-500">
+            Turn this idea into a project, carrying its analysis across as
+            context.
+          </p>
+          <PromoteIdeaForm ideaId={idea.id} defaults={promoteDefaults} />
+        </section>
+      )}
 
       {analysis ? (
         <section className="mt-8 rounded-xl border border-neutral-800 bg-neutral-900 p-5">

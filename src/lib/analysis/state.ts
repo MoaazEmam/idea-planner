@@ -16,6 +16,21 @@ export function hashText(text: string): string {
 }
 
 /**
+ * The full analysable source: the original capture plus any later additions, in
+ * capture order. Both the analyser and the staleness hash use this, so adding a
+ * clarification marks an analysis out of date exactly as editing the text does.
+ */
+export function ideaSourceText(
+  rawText: string,
+  clarifications: string[] = [],
+): string {
+  if (clarifications.length === 0) {
+    return rawText;
+  }
+  return `${rawText}\n\n--- Later clarifications ---\n${clarifications.join("\n")}`;
+}
+
+/**
  * True when the idea text changed after the analysis was produced, so what is
  * stored no longer describes what is on screen.
  *
@@ -28,6 +43,7 @@ export function isAnalysisStale(
     Idea,
     "updatedAt" | "routedAt" | "processedAt" | "rawText" | "analysis"
   >,
+  clarifications: string[] = [],
 ): boolean {
   const analysis = parseStoredAnalysis(idea.analysis);
   if (!analysis) {
@@ -36,7 +52,9 @@ export function isAnalysisStale(
   }
 
   if (analysis.sourceHash) {
-    return analysis.sourceHash !== hashText(idea.rawText);
+    return (
+      analysis.sourceHash !== hashText(ideaSourceText(idea.rawText, clarifications))
+    );
   }
 
   // Legacy analysis written before sourceHash existed.

@@ -1,12 +1,13 @@
 import type { Project } from "@/db/schema";
 import type { CompletionUsage } from "@/lib/llm/client";
 import { completeValidatedJson } from "@/lib/llm/validate";
+import { clarificationBlock } from "./analyze-standalone";
 import {
   LINKED_PROMPT_VERSION,
   linkedAnalysisSchema,
   type LinkedStoredAnalysis,
 } from "./schema";
-import { hashText } from "./state";
+import { hashText, ideaSourceText } from "./state";
 
 /** Project context is free-form and can be long; the model sees a bounded slice. */
 const MAX_CONTEXT_CHARS = 6000;
@@ -67,6 +68,7 @@ export async function enrichLinked(
   ideaText: string,
   project: Project,
   decision: LinkedDecision,
+  clarifications: string[] = [],
 ): Promise<LinkedEnrichmentResult> {
   const result = await completeValidatedJson({
     schema: linkedAnalysisSchema,
@@ -79,7 +81,7 @@ export async function enrichLinked(
 Routing said: ${decision.linkType} (confidence ${decision.confidence}). Reason: ${decision.reasoning || "(none given)"}
 
 Idea:
-"""${ideaText}"""
+"""${ideaText}"""${clarificationBlock(clarifications)}
 
 ${USER_INSTRUCTIONS}`,
       },
@@ -105,7 +107,7 @@ ${USER_INSTRUCTIONS}`,
       promptVersion: LINKED_PROMPT_VERSION,
       model: result.model,
       generatedAt: new Date().toISOString(),
-      sourceHash: hashText(ideaText),
+      sourceHash: hashText(ideaSourceText(ideaText, clarifications)),
       projectId: project.id,
       projectName: project.name,
       linkType: decision.linkType,

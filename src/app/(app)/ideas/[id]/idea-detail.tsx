@@ -2,17 +2,28 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  BUTTON_DANGER,
+  BUTTON_PRIMARY,
+  BUTTON_QUIET,
+} from "@/components/button";
 import type { Idea } from "@/db/schema";
 import { isAnalysisStale } from "@/lib/analysis/state";
 
-export function IdeaDetail({ idea }: { idea: Idea }) {
+export function IdeaDetail({
+  idea,
+  additions = [],
+}: {
+  idea: Idea;
+  additions?: string[];
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(idea.rawText);
   const [busy, setBusy] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const stale = isAnalysisStale(idea);
+  const stale = isAnalysisStale(idea, additions);
 
   async function save() {
     const value = text.trim();
@@ -100,12 +111,12 @@ export function IdeaDetail({ idea }: { idea: Idea }) {
             autoFocus
             className="w-full resize-y rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-3 text-base leading-relaxed text-neutral-100 outline-none focus:border-neutral-600"
           />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={save}
               disabled={busy || text.trim().length === 0}
-              className="rounded-lg bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+              className={BUTTON_PRIMARY}
             >
               {busy ? "Saving…" : "Save"}
             </button>
@@ -116,7 +127,7 @@ export function IdeaDetail({ idea }: { idea: Idea }) {
                 setEditing(false);
                 setError(null);
               }}
-              className="text-sm text-neutral-500 transition hover:text-neutral-300"
+              className={BUTTON_QUIET}
             >
               Cancel
             </button>
@@ -130,12 +141,12 @@ export function IdeaDetail({ idea }: { idea: Idea }) {
         </article>
       )}
 
-      <div className="flex items-center gap-5 text-sm">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
         {editing ? null : (
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-neutral-400 transition hover:text-neutral-100"
+            className={BUTTON_QUIET}
           >
             Edit
           </button>
@@ -145,7 +156,7 @@ export function IdeaDetail({ idea }: { idea: Idea }) {
             type="button"
             onClick={reanalyze}
             disabled={busy || analyzing}
-            className="text-neutral-400 transition hover:text-neutral-100 disabled:opacity-40"
+            className={BUTTON_QUIET}
           >
             {analyzing
               ? "Analyzing…"
@@ -158,14 +169,14 @@ export function IdeaDetail({ idea }: { idea: Idea }) {
           type="button"
           onClick={remove}
           disabled={busy || analyzing}
-          className="text-neutral-500 transition hover:text-red-400 disabled:opacity-40"
+          className={BUTTON_DANGER}
         >
           Delete
         </button>
         {stale && !analyzing ? (
-          <span className="text-amber-400">Edited since last analysis</span>
+          <span className="px-2 text-amber-400">Edited since last analysis</span>
         ) : null}
-        {error ? <span className="text-red-400">{error}</span> : null}
+        {error ? <span className="px-2 text-red-400">{error}</span> : null}
       </div>
     </div>
   );

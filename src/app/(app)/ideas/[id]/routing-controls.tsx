@@ -2,14 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { BUTTON_PRIMARY, CONTROL } from "@/components/button";
 
 type ProjectOption = { id: string; name: string };
 
 const UNSORTED = "unsorted";
 const STANDALONE = "standalone";
-
-const controlClass =
-  "rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-600";
 
 export function RoutingControls({
   ideaId,
@@ -82,7 +80,7 @@ export function RoutingControls({
             setDone(false);
           }}
           disabled={busy}
-          className={controlClass}
+          className={CONTROL}
           aria-label="Where this idea belongs"
         >
           <option value={UNSORTED}>Unsorted</option>
@@ -105,7 +103,7 @@ export function RoutingControls({
               setKind(event.target.value === "spinoff" ? "spinoff" : "feature")
             }
             disabled={busy}
-            className={controlClass}
+            className={CONTROL}
             aria-label="Link type"
           >
             <option value="feature">Feature</option>
@@ -117,7 +115,7 @@ export function RoutingControls({
           type="button"
           onClick={apply}
           disabled={busy || unchanged}
-          className="rounded-lg bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+          className={BUTTON_PRIMARY}
         >
           {busy ? "Analyzing…" : "Apply"}
         </button>

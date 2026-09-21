@@ -34,3 +34,14 @@ export const routeIdeaSchema = z.discriminatedUnion("link_type", [
 ]);
 
 export type RouteIdeaInput = z.infer<typeof routeIdeaSchema>;
+
+/** Later clarification appended to an idea. Kept short and plain. */
+export const additionSchema = z.object({
+  text: z
+    .string()
+    .trim()
+    .min(1, "text must not be empty")
+    .max(4000, "text is too long"),
+});
+
+export type AdditionInput = z.infer<typeof additionSchema>;

@@ -28,6 +28,9 @@ web form ───────┼─► store ─► nightly ─► LLM picks a 
   request keeps each invocation inside the 60s function limit.
 - **Manual control** matters: sorting an unsorted idea, editing a description,
   and re-running an analysis are all user actions, not automatic ones.
+- **Auto-routing sees only `active` projects.** Paused and done projects are
+  left out of the model's candidate list; they still appear in the manual Sort
+  control if you want to park something there anyway.
 
 ### Idea lifecycle
 
@@ -90,6 +93,7 @@ db:generate` creates a migration from `src/db/schema.ts`.
 | `DEEPSEEK_API_KEY` | yes | Routing and analysis |
 | `TAVILY_API_KEY` | for standalone ideas | Web research |
 | `PROCESSING_ENABLED` | no | `false` makes `/api/process` a no-op (kill switch) |
+| `ALERT_WEBHOOK_URL` | no | Posts a JSON alert on a failed run or an idea that exhausted its attempts |
 | `LINK_CONFIDENCE_THRESHOLD` | no | Auto-link floor, default `0.7` |
 | `MAX_IDEAS_PER_RUN` | no | Per-run ceiling, enforced by the API and the workflow |
 | `DEEPSEEK_ROUTING_MODEL` / `DEEPSEEK_ANALYSIS_MODEL` | no | Default `deepseek-flash` |
@@ -140,6 +144,7 @@ Vercel environment variables only take effect after a redeploy.
 | `POST /api/ideas/[id]/restore` | session | undo a soft delete |
 | `POST /api/process` | worker token | one idea per request; `action: "finish"` closes a run |
 | `POST /api/projects`, `PATCH` / `DELETE /api/projects/[id]` | session | deleting a project unlinks its ideas |
+| `GET /api/export` | session | download all projects, ideas (incl. trashed), and runs as JSON |
 | `GET /api/health` | none | liveness |
 
 Pages: `/` inbox · `/ideas/[id]` · `/projects` · `/projects/[id]` · `/runs` ·
@@ -166,7 +171,11 @@ development. Function region is `fra1`; the database is Supabase
   next run reclaims it. Concurrent runs cannot double-process an idea
   (`FOR UPDATE SKIP LOCKED`), and manual actions return 409 while it is locked.
 - **An idea stopped retrying** — after 3 attempts it stays `failed` until you
-  use Re-analyze, which resets the attempt counter.
+  use Re-analyze, which resets the attempt counter. If `ALERT_WEBHOOK_URL` is
+  set, that third failure is pushed to you instead of waiting to be noticed.
+- **Locked out of login** — five failed passphrase attempts from one IP within
+  fifteen minutes locks that IP until the window passes; a successful login
+  clears it. The lock is stored in `login_attempts`.
 - **Models answered on the wrong scale** — scores are normalised, so `0.85` and
   `85` both become a valid 1–10 value instead of failing validation.
 

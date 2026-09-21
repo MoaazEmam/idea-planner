@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { BUTTON_DANGER } from "@/components/button";
 
 export function DeleteProjectButton({
   id,
@@ -49,12 +50,12 @@ export function DeleteProjectButton({
   }
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-wrap items-center gap-3">
       <button
         type="button"
         onClick={remove}
         disabled={busy}
-        className="text-sm text-neutral-500 transition hover:text-red-400 disabled:opacity-40"
+        className={BUTTON_DANGER}
       >
         {busy ? "Deleting…" : "Delete project"}
       </button>

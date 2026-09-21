@@ -131,6 +131,11 @@ export type LinkedStoredAnalysis = LinkedAnalysis & {
   projectId: string;
   projectName: string;
   linkType: "feature" | "spinoff";
+  /**
+   * Present for spinoffs, which also run standalone market research because a
+   * spinoff is its own product. Absent when the research half failed.
+   */
+  research?: StandaloneStoredAnalysis;
 };
 
 const linkedStoredSchema = linkedAnalysisSchema.extend({
@@ -142,6 +147,7 @@ const linkedStoredSchema = linkedAnalysisSchema.extend({
   projectId: z.string(),
   projectName: z.string(),
   linkType: z.enum(["feature", "spinoff"]),
+  research: standaloneStoredSchema.optional(),
 });
 
 /* -------------------------------------------------------------------------- */

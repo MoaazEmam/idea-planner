@@ -7,10 +7,19 @@ import type { ProjectInput } from "@/lib/validation/projects";
 
 export async function listProjects({
   includeArchived = false,
-}: { includeArchived?: boolean } = {}): Promise<Project[]> {
+  activeOnly = false,
+}: {
+  includeArchived?: boolean;
+  activeOnly?: boolean;
+} = {}): Promise<Project[]> {
   const db = getDb();
+  const conditions = [
+    includeArchived ? undefined : isNull(projects.archivedAt),
+    activeOnly ? eq(projects.status, "active") : undefined,
+  ].filter((condition) => condition !== undefined);
+
   return db.query.projects.findMany({
-    where: includeArchived ? undefined : isNull(projects.archivedAt),
+    where: conditions.length > 0 ? and(...conditions) : undefined,
     orderBy: [asc(projects.name)],
   });
 }
@@ -96,8 +105,63 @@ export async function deleteProject(id: string): Promise<DeleteProjectResult> {
   });
 }
 
-/** Ideas currently linked to a project, newest first. */
-export async function listProjectIdeas(
+export type PromoteResult =
+  | { ok: true; project: Project; idea: Idea }
+  | { ok: false; reason: "not_found" | "already_linked" };
+
+/**
+ * Creates a project from an idea and links the idea to it as the origin, in one
+ * transaction: a project is never created without its origin link, and an
+ * already-linked idea cannot be promoted twice.
+ */
+export async function createProjectFromIdea(
+  ideaId: string,
+  input: ProjectInput,
+): Promise<PromoteResult> {
+  if (!isUuid(ideaId)) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const db = getDb();
+  return db.transaction(async (tx) => {
+    const idea = await tx.query.ideas.findFirst({
+      where: and(eq(ideas.id, ideaId), isNull(ideas.deletedAt)),
+    });
+
+    if (!idea) {
+      return { ok: false, reason: "not_found" };
+    }
+    if (idea.projectId) {
+      return { ok: false, reason: "already_linked" };
+    }
+
+    const [project] = await tx
+      .insert(projects)
+      .values({
+        name: input.name,
+        oneLiner: input.one_liner,
+        context: input.context,
+        status: input.status,
+      })
+      .returning();
+
+    const [updated] = await tx
+      .update(ideas)
+      .set({
+        linkType: "spinoff",
+        linkSource: "manual",
+        linkConfidence: 1,
+        projectId: project.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(ideas.id, ideaId))
+      .returning();
+
+    return { ok: true, project, idea: updated };
+  });
+}
+
+/** Ideas currently linked to a project, newest first. */export async function listProjectIdeas(
   projectId: string,
   limit = 100,
 ): Promise<Idea[]> {

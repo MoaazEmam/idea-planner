@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { BUTTON_PRIMARY, CONTROL, FIELD } from "@/components/button";
 import type { Project } from "@/db/schema";
 import { PROJECT_STATUSES } from "@/lib/validation/projects";
 
@@ -23,8 +24,7 @@ export function ProjectForm(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const fieldClass =
-    "w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-base text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-neutral-600";
+  const fieldClass = FIELD;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,7 +130,7 @@ export function ProjectForm(props: Props) {
             id="project-status"
             value={status}
             onChange={(event) => setStatus(event.target.value)}
-            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-600"
+            className={CONTROL}
           >
             {PROJECT_STATUSES.map((value) => (
               <option key={value} value={value}>
@@ -157,7 +157,7 @@ export function ProjectForm(props: Props) {
         <button
           type="submit"
           disabled={saving || name.trim().length === 0}
-          className="rounded-lg bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+          className={BUTTON_PRIMARY}
         >
           {saving
             ? "Saving…"

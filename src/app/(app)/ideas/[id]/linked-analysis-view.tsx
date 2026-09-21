@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AnalysisView } from "./analysis-view";
 import type { LinkedStoredAnalysis } from "@/lib/analysis/schema";
 
 const SCOPE_FIT: Record<
@@ -157,6 +158,15 @@ export function LinkedAnalysisView({
       <Section title="Next step">
         <p className="text-neutral-200">{analysis.next_step}</p>
       </Section>
+
+      {analysis.research ? (
+        <section className="space-y-4 border-t border-neutral-800 pt-6">
+          <h3 className="text-xs uppercase tracking-widest text-neutral-500">
+            Market research
+          </h3>
+          <AnalysisView analysis={analysis.research} />
+        </section>
+      ) : null}
 
       <p className="text-[11px] text-neutral-600">
         {analysis.model || "model"} · prompt v{analysis.promptVersion} ·{" "}

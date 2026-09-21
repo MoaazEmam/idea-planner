@@ -36,6 +36,20 @@
       "when": 1789883562506,
       "tag": "0004_unusual_warbird",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790005608166,
+      "tag": "0005_motionless_cammi",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790006174914,
+      "tag": "0006_cynical_franklin_storm",
+      "breakpoints": true
     }
   ]
 }

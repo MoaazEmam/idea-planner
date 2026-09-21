@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { processingRuns, type ProcessingRun } from "@/db/schema";
+import { sendAlert } from "@/lib/alerts";
 
 export async function ensureRun(runId: string, trigger: string): Promise<void> {
   const db = getDb();
@@ -35,16 +36,43 @@ export async function recordRunProgress(
     .where(eq(processingRuns.id, runId));
 }
 
+/** One alert per run, on the first close, so a second `finish` is silent. */
+async function alertOnRun(run: ProcessingRun): Promise<void> {
+  if (run.status === "failed") {
+    await sendAlert(
+      `Idea Inbox: enrichment run ${run.id} failed — ${
+        run.error ?? "no error recorded"
+      }`,
+    );
+    return;
+  }
+
+  if (run.failed > 0) {
+    await sendAlert(
+      `Idea Inbox: enrichment run ${run.id} finished with ${run.failed} failed and ${run.processed} processed.`,
+    );
+  }
+}
+
 export async function finishRun(
   runId: string,
   status: string,
   error?: string,
 ): Promise<void> {
   const db = getDb();
-  await db
+  const previous = await db.query.processingRuns.findFirst({
+    where: eq(processingRuns.id, runId),
+  });
+
+  const [run] = await db
     .update(processingRuns)
     .set({ status, error: error ?? null, finishedAt: new Date() })
-    .where(eq(processingRuns.id, runId));
+    .where(eq(processingRuns.id, runId))
+    .returning();
+
+  if (run && !previous?.finishedAt) {
+    await alertOnRun(run);
+  }
 }
 
 export async function getRun(runId: string): Promise<ProcessingRun | undefined> {

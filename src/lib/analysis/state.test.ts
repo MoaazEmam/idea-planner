@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashText, isAnalysisStale } from "./state";
+import { hashText, ideaSourceText, isAnalysisStale } from "./state";
 
 const text = "some idea text";
 const earlier = new Date("2026-09-20T00:30:00Z");
@@ -56,9 +56,38 @@ describe("hashText", () => {
   });
 });
 
+describe("ideaSourceText", () => {
+  it("returns the raw text when there are no clarifications", () => {
+    expect(ideaSourceText(text)).toBe(text);
+    expect(ideaSourceText(text, [])).toBe(text);
+  });
+
+  it("appends clarifications in order", () => {
+    const source = ideaSourceText(text, ["first", "second"]);
+    expect(source).toContain(text);
+    expect(source.indexOf("first")).toBeLessThan(source.indexOf("second"));
+  });
+});
+
 describe("isAnalysisStale", () => {
   it("is false when the text is unchanged", () => {
     expect(isAnalysisStale(makeIdea())).toBe(false);
+  });
+
+  it("is true when an addition was appended after the analysis", () => {
+    expect(isAnalysisStale(makeIdea(), ["a later thought"])).toBe(true);
+  });
+
+  it("is false when the additions match the analysed source", () => {
+    const clarifications = ["a later thought"];
+    expect(
+      isAnalysisStale(
+        makeIdea({
+          analysis: analysisWith(hashText(ideaSourceText(text, clarifications))),
+        }),
+        clarifications,
+      ),
+    ).toBe(false);
   });
 
   it("is true when the text was edited", () => {

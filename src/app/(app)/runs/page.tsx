@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BUTTON_GHOST } from "@/components/button";
 import { formatRelativeTime } from "@/lib/format";
 import { listRuns } from "@/lib/jobs/runs";
 
@@ -61,6 +62,18 @@ export default async function RunsPage() {
           })}
         </ul>
       )}
+
+      <section className="mt-10 space-y-2">
+        <h2 className="text-xs uppercase tracking-widest text-neutral-500">
+          Backup
+        </h2>
+        <p className="text-sm text-neutral-500">
+          Download every project, idea (including trashed), and run as JSON.
+        </p>
+        <a href="/api/export" download className={BUTTON_GHOST}>
+          Download JSON
+        </a>
+      </section>
     </main>
   );
 }

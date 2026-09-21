@@ -7,7 +7,7 @@ import {
   standaloneAnalysisSchema,
   type StandaloneStoredAnalysis,
 } from "./schema";
-import { hashText } from "./state";
+import { hashText, ideaSourceText } from "./state";
 
 /** Sources are ranked and truncated: the model sees a bounded, high-signal set. */
 const MAX_SOURCES = 8;
@@ -59,6 +59,16 @@ function sourceBlock(sources: ResearchResult[]): string {
     .join("\n\n");
 }
 
+/** Later clarifications are labelled so the model weighs them as refinements. */
+export function clarificationBlock(clarifications: string[]): string {
+  if (clarifications.length === 0) {
+    return "";
+  }
+  return `\n\nLater clarifications (added after the original idea):\n"""${clarifications.join(
+    "\n",
+  )}"""`;
+}
+
 function addUsage(a: CompletionUsage, b: CompletionUsage): CompletionUsage {
   return {
     promptTokens: a.promptTokens + b.promptTokens,
@@ -75,12 +85,14 @@ function addUsage(a: CompletionUsage, b: CompletionUsage): CompletionUsage {
  */
 export async function enrichStandalone(
   ideaText: string,
+  clarifications: string[] = [],
 ): Promise<StandaloneEnrichmentResult> {
-  const queryResult = await generateSearchQueries(ideaText);
+  const sourceText = ideaSourceText(ideaText, clarifications);
+  const queryResult = await generateSearchQueries(sourceText);
 
   let usage = queryResult.usage;
 
-  const trimmedIdea = ideaText.replace(/\s+/g, " ").trim();
+  const trimmedIdea = sourceText.replace(/\s+/g, " ").trim();
   const queries =
     queryResult.queries.length > 0
       ? queryResult.queries
@@ -122,7 +134,9 @@ export async function enrichStandalone(
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
-        content: `Idea:\n"""${ideaText}"""\n\nSources:\n${sourceBlock(sources)}\n\n${USER_INSTRUCTIONS}`,
+        content: `Idea:\n"""${ideaText}"""${clarificationBlock(
+          clarifications,
+        )}\n\nSources:\n${sourceBlock(sources)}\n\n${USER_INSTRUCTIONS}`,
       },
     ],
     options: { kind: "analysis", thinking: true, maxTokens: 12000 },
@@ -148,7 +162,7 @@ export async function enrichStandalone(
       promptVersion: STANDALONE_PROMPT_VERSION,
       model: analysisResult.model,
       generatedAt: new Date().toISOString(),
-      sourceHash: hashText(ideaText),
+      sourceHash: hashText(sourceText),
       searchQueries: queries,
       sources: sources.map((source) => ({
         title: source.title,

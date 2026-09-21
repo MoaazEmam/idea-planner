@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -71,10 +72,35 @@ export const ideas = pgTable(
 );
 
 /**
+ * Append-only clarifications for an idea. Kept in their own table rather than a
+ * column so the original capture is never rewritten, and so each addition can
+ * be deleted on its own. Ordering by created_at is the order they are fed to the
+ * analyser, which makes the source hash stable.
+ */
+export const ideaAdditions = pgTable(
+  "idea_additions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ideaId: uuid("idea_id")
+      .notNull()
+      .references(() => ideas.id, { onDelete: "cascade" }),
+    text: text("text").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idea_additions_idea_id_idx").on(table.ideaId, table.createdAt),
+  ],
+);
+
+export type IdeaAddition = typeof ideaAdditions.$inferSelect;
+export type NewIdeaAddition = typeof ideaAdditions.$inferInsert;
+
+/**
  * One row per nightly (or manual) processing run. The GitHub Actions loop
  * passes a stable runId so counters accumulate across its per-idea requests.
- */
-export const processingRuns = pgTable("processing_runs", {
+ */export const processingRuns = pgTable("processing_runs", {
   id: text("id").primaryKey(),
   trigger: text("trigger").notNull().default("manual"),
   status: text("status").notNull().default("running"),
@@ -96,3 +122,26 @@ export type NewProject = typeof projects.$inferInsert;
 export type Idea = typeof ideas.$inferSelect;
 export type NewIdea = typeof ideas.$inferInsert;
 export type ProcessingRun = typeof processingRuns.$inferSelect;
+
+/**
+ * Login brute-force guard. Serverless functions share no memory, so the failed
+ * attempts are counted in Postgres keyed by client IP. Old rows are pruned
+ * opportunistically by the same code that writes them.
+ */
+export const loginAttempts = pgTable(
+  "login_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ip: text("ip").notNull(),
+    successful: boolean("successful").notNull().default(false),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("login_attempts_ip_attempted_at_idx").on(table.ip, table.attemptedAt),
+  ],
+);
+
+export type LoginAttempt = typeof loginAttempts.$inferSelect;
+

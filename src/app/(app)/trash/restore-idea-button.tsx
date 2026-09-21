@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { BUTTON_QUIET } from "@/components/button";
 
 export function RestoreIdeaButton({ id }: { id: string }) {
   const router = useRouter();
@@ -29,12 +30,12 @@ export function RestoreIdeaButton({ id }: { id: string }) {
   }
 
   return (
-    <div className="flex shrink-0 items-center gap-3 text-sm">
+    <div className="flex shrink-0 flex-wrap items-center gap-2 text-sm">
       <button
         type="button"
         onClick={restore}
         disabled={busy}
-        className="text-neutral-400 transition hover:text-neutral-100 disabled:opacity-40"
+        className={BUTTON_QUIET}
       >
         {busy ? "Restoring…" : "Restore"}
       </button>

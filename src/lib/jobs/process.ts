@@ -5,6 +5,8 @@ import { enrichLinked } from "@/lib/analysis/analyze-linked";
 import { enrichStandalone } from "@/lib/analysis/analyze-standalone";
 import type { StoredAnalysis } from "@/lib/analysis/schema";
 import { unsortedResetFields } from "@/lib/ideas";
+import { sendAlert } from "@/lib/alerts";
+import { listAdditionTexts } from "@/lib/additions";
 import { getProject, listProjects } from "@/lib/projects";
 import { routeIdea, type RoutingDecision } from "@/lib/routing/route-idea";
 import { ensureRun, finishRun, getRun, recordRunProgress } from "./runs";
@@ -246,7 +248,7 @@ async function markFailed(
   routing?: AppliedRouting,
 ): Promise<void> {
   const db = getDb();
-  await db
+  const [updated] = await db
     .update(ideas)
     .set({
       analysisStatus: "failed",
@@ -257,7 +259,19 @@ async function markFailed(
       updatedAt: new Date(),
       ...(routing ? routingFields(routing) : {}),
     })
-    .where(eq(ideas.id, ideaId));
+    .where(eq(ideas.id, ideaId))
+    .returning({ attempts: ideas.analysisAttempts });
+
+  // The nightly queue stops retrying at the ceiling; tell the operator once,
+  // because otherwise the idea just sits as "failed" until it is noticed.
+  if (updated && updated.attempts >= MAX_ATTEMPTS) {
+    await sendAlert(
+      `Idea Inbox: idea ${ideaId} failed ${updated.attempts} times and needs a manual re-analyze. Last error: ${error.slice(
+        0,
+        300,
+      )}`,
+    );
+  }
 }
 
 /**
@@ -277,7 +291,13 @@ async function analyzeIdea(
     }
   };
 
-  const projects = await listProjects();
+  // Only active projects are routing candidates. Paused/done projects stay
+  // visible in the UI (manual sorting still allows them) but the model must not
+  // send fresh ideas to a project the user has parked.
+  const projects = await listProjects({ activeOnly: true });
+
+  // Later clarifications are part of the analysable source.
+  const clarifications = await listAdditionTexts(idea.id);
 
   let routing: AppliedRouting;
   if (manual) {
@@ -301,7 +321,7 @@ async function analyzeIdea(
   // Standalone ideas get web research. Linked ideas get a project-context
   // analysis. Unsorted ideas stop at "routed" until the user sorts them.
   if (routing.decision.status === "standalone") {
-    const enrichment = await enrichStandalone(idea.rawText);
+    const enrichment = await enrichStandalone(idea.rawText, clarifications);
     await record({
       inputTokens: enrichment.usage.promptTokens,
       outputTokens: enrichment.usage.completionTokens,
@@ -329,15 +349,28 @@ async function analyzeIdea(
       throw new Error("routed to a project that no longer exists");
     }
 
-    const enrichment = await enrichLinked(idea.rawText, project, {
+    const decision = {
       linkType: routing.decision.linkType,
       confidence: routing.decision.confidence,
       reasoning: routing.decision.reasoning,
-    });
+    };
+
+    // A spinoff is its own product, so it earns market research on top of the
+    // fit analysis. Both run at once so the pair stays inside the function
+    // budget; if the research half fails, the fit analysis is still stored.
+    const [enrichment, research] = await Promise.all([
+      enrichLinked(idea.rawText, project, decision, clarifications),
+      decision.linkType === "spinoff"
+        ? enrichStandalone(idea.rawText, clarifications)
+        : Promise.resolve(null),
+    ]);
 
     await record({
-      inputTokens: enrichment.usage.promptTokens,
-      outputTokens: enrichment.usage.completionTokens,
+      inputTokens:
+        enrichment.usage.promptTokens + (research?.usage.promptTokens ?? 0),
+      outputTokens:
+        enrichment.usage.completionTokens + (research?.usage.completionTokens ?? 0),
+      searches: research?.searches ?? 0,
     });
 
     if (!enrichment.analysis) {
@@ -347,7 +380,11 @@ async function analyzeIdea(
       return { status: "failed", error: message };
     }
 
-    await markEnriched(idea.id, routing, enrichment.analysis, enrichment.raw);
+    const analysis = research?.analysis
+      ? { ...enrichment.analysis, research: research.analysis }
+      : enrichment.analysis;
+
+    await markEnriched(idea.id, routing, analysis, enrichment.raw);
     await record({ processed: 1 });
     return { status: "enriched" };
   }

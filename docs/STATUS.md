@@ -1,6 +1,6 @@
 # Project status
 
-_Updated 2026-09-21 · `main` at `1708a97` with phase 7 + wave 1 uncommitted · production: https://idea-planner-moaaz12.vercel.app_
+_Updated 2026-09-21 · `main` at `468a937` · production: https://idea-planner-moaaz12.vercel.app_
 
 A snapshot of what is shipped, what is verified, and what is left. Setup,
 architecture, and the env reference live in the [`README`](../README.md).
@@ -22,11 +22,14 @@ they reflect the order the work actually landed.
 | — | Unsorted triage: sort an idea by hand (project / standalone / unsorted) | `9fdf6c5` |
 | — | Deletion integrity: unlink ideas on project delete, Trash + restore | `22cc27e` |
 | — | Cleanup: `MAX_IDEAS_PER_RUN` enforced, run errors recorded, dead columns dropped, README | `1708a97` |
-| 7 | Mobile ergonomics: shared `components/button.ts`, 44px tap targets across every control | unreleased |
-| — | Routing ignores paused/done projects (`listProjects({ activeOnly })`) | unreleased |
-| — | Alerts: failed runs and attempt-exhausted ideas post to `ALERT_WEBHOOK_URL` | unreleased |
-| — | `GET /api/export` full JSON backup + Download button on `/runs` | unreleased |
-| — | Login rate limiting: 5 failures / 15 min per IP, `login_attempts` table | unreleased |
+| 7 | Mobile ergonomics: shared `components/button.ts`, 44px tap targets across every control | `468a937` |
+| — | Routing ignores paused/done projects (`listProjects({ activeOnly })`) | `468a937` |
+| — | Alerts: failed runs and attempt-exhausted ideas post to `ALERT_WEBHOOK_URL` | `468a937` |
+| — | `GET /api/export` full JSON backup + Download button on `/runs` | `468a937` |
+| — | Login rate limiting: 5 failures / 15 min per IP, `login_attempts` table | `468a937` |
+| 8 | Promote an idea to a project, carrying the analysis into project context | `468a937` |
+| 9 | Iterative ideas: append-only additions folded into the analysis + source hash | `468a937` |
+| — | Spinoffs run standalone market research alongside the fit analysis | `468a937` |
 
 Three production bugs were found and fixed along the way: trailing prose after
 `json_object` output (`721903d`), thinking-mode responses exhausting
@@ -36,65 +39,30 @@ source hash).
 
 ## Verified
 
-- Phase 7 + wave 1, locally: `npm run build`, `typecheck`, and `lint` clean;
-  `npm test` → 37 passed. Migration `0005_motionless_cammi` (the
-  `login_attempts` table) applied to the production database and granted. Not
-  yet smoke-tested or exercised against production.
-- Before this change set: `npm run build`, `typecheck`, `lint` clean; `npm test` → 37 passed.
+- Phase 7 + wave 1 + wave 2, locally: `npm run build`, `typecheck`, and `lint`
+  clean; `npm test` → 48 passed (new tests for the promote builder and
+  additions-aware staleness). Migrations `0005` (`login_attempts`) and `0006`
+  (`idea_additions`) applied to the production database and granted; both tables
+  verified present.
+- Deployed: `468a937` built READY on Vercel and aliased to production. Production
+  smoke of the new surface: `/api/health` → 200, `/api/export` without a session
+  → 401.
+- Before this change set: `npm run build`, `typecheck`, `lint` clean; `npm test`
+  → 37 passed.
 - `npm run smoke` → 26/26 against production (auth, idempotent capture,
   dashboard, projects, idea edit/delete, self-cleanup).
-- Production checks: `/runs`, `/trash`, inbox Trash link, the Sort control, the
-  Re-analyze button, and `POST /api/ideas/[id]/link` validation (400 without a
-  project).
 - Database: 4 live ideas, 4 trashed (all yours), 1 project, no test residue.
 
 ## Planned
 
-New work agreed after the phase-6 close-out. Phase numbers continue the table
-above; order is a proposal, not a commitment. Phase 7 (mobile ergonomics) and
-wave 1 (`#4`, `#6`, `#9`, `#10` in the backlog) have since shipped — see the
-table above.
+Everything agreed at the phase-6 close-out has now shipped (phases 7-9 and the
+wave-1 hardening in `468a937`). What remains is content, not code.
 
-### Phase 8 — Promote an idea to a project
+### Packaging
 
-Turn a captured idea (usually one that analysed as standalone) into a project,
-carrying the analysis across instead of re-typing context:
-
-- Action on the idea page opens a pre-filled project form (reuse
-  `project-form.tsx`), so the user can edit before saving.
-- `name` from the idea (editable); `one_liner` from the analysis `summary`;
-  `context` assembled from the raw text plus the standalone analysis
-  (`summary`, `market_landscape`, `existing_solutions`, `suggested_features`,
-  `risks`, `next_step`).
-- The originating idea is then linked to the new project as a `spinoff`, so the
-  project page shows its origin.
-- One transactional endpoint (`POST /api/ideas/[id]/promote`) creates the
-  project and the link together — never a project without its origin.
-- Linked-analysis ideas can promote too, using `implementation`, `risks`, and
-  `open_questions` for the context block.
-
-### Phase 9 — Iterative ideas (design, not settled)
-
-Goal: capture the idea once, then attach later clarifications or additions
-after reading the analysis, without it becoming a chat thread. Proposal:
-
-- **Append-only additions**: a short list of timestamped notes on the idea. No
-  replies, no authorship, no thread state. A new `idea_additions` table (or a
-  jsonb array on `ideas`) keeps them separate from `raw_text`, so the original
-  capture is never rewritten.
-- Adding one marks the analysis stale (fold additions into the stored source
-  hash) and re-analysis feeds them to the model as a "Later clarifications"
-  block. Re-analysis stays manual, matching the app's existing stance.
-- UI: a compact "Add a thought" box plus the list, below the idea text.
-
-Explicitly **not** in scope: threaded comments, replies, multiple authors,
-auto-re-analysis.
-
-### Packaging (content, phase-independent)
-
-Copy for listing Idea Inbox itself as a project on the portfolio site, shaped to
-fit the app's own `projects.one_liner` (≤300) and `projects.context` (≤20000)
-fields should it also be seeded here.
+Idea Inbox itself can be seeded as a project (the user will do this by hand);
+the one-liner and context are in the session notes, shaped to fit
+`projects.one_liner` (≤300) and `projects.context` (≤20000).
 
 ## Known issues
 
@@ -113,9 +81,7 @@ fields should it also be seeded here.
 
 1. Search / filter / pagination for ideas (inbox caps at 100) and runs (50).
 2. Bulk actions — re-analyze, delete, or re-sort many ideas at once.
-3. Spinoffs currently get the project-context analysis; they may warrant market
-   research like a standalone.
-4. Restore for projects (they are hard-deleted by design) if that changes.
+3. Restore for projects (they are hard-deleted by design) if that changes.
 
 ### Reliability
 
@@ -131,5 +97,6 @@ fields should it also be seeded here.
 - **GitHub disables scheduled workflows** after 60 days of repo inactivity;
   `gh workflow run nightly.yml` always works.
 - **60s function ceiling** — one idea per request keeps standalone (~25s) and
-  linked (~17s) inside it, with modest headroom.
+  linked (~17s) inside it, with modest headroom. Spinoffs run fit + research in
+  parallel, so the pair costs roughly the slower half, not the sum.
 - **Single-user model** — one passphrase, no accounts.

@@ -49,6 +49,21 @@ Editing the text does not silently re-queue an idea. The idea page shows
 "Edited since last analysis" (compared via a stored source hash) and a
 **Re-analyze** button.
 
+**Additions** are append-only clarifications on an idea — a "later I realised…"
+note, not a discussion thread. They are stored separately from the original
+capture, folded into the analysis prompt as later clarifications, and included
+in the source hash, so adding one marks the analysis as out of date the same way
+an edit does.
+
+An idea can be **promoted to a project** (from the idea page): the analysis is
+carried into the new project's `context` (market landscape, suggested v1
+features, risks, scores, sources), the idea is linked to it as a `spinoff`, and
+the whole thing happens in one transaction.
+
+A `spinoff` runs the project-fit analysis **and** standalone market research
+together, because a spinoff is its own product rather than a feature. If the
+research half fails, the fit analysis is still saved.
+
 ## Stack
 
 Next.js 16 (App Router, Node runtime) · TypeScript strict · Tailwind v4 ·
@@ -141,6 +156,8 @@ Vercel environment variables only take effect after a redeploy.
 | `PATCH` / `DELETE /api/ideas/[id]` | session | edit text / soft delete |
 | `POST /api/ideas/[id]/reanalyze` | session | re-run analysis for one idea |
 | `POST /api/ideas/[id]/link` | session | manual sort: unsorted, standalone, feature, spinoff |
+| `POST /api/ideas/[id]/additions` · `DELETE /api/ideas/[id]/additions/[additionId]` | session | append / remove a clarification |
+| `POST /api/ideas/[id]/promote` | session | create a project from an idea, linked as a spinoff |
 | `POST /api/ideas/[id]/restore` | session | undo a soft delete |
 | `POST /api/process` | worker token | one idea per request; `action: "finish"` closes a run |
 | `POST /api/projects`, `PATCH` / `DELETE /api/projects/[id]` | session | deleting a project unlinks its ideas |

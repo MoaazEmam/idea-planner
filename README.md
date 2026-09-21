@@ -175,8 +175,20 @@ development. Function region is `fra1`; the database is Supabase
 `eu-central-1`. Deployments are Next.js functions, and `/api/process` declares
 `maxDuration = 60`.
 
+Run `db:migrate` and `db:grant` **when the app is idle**, not alongside a deploy.
+`ALTER`/`GRANT` statements take table-wide locks, and against live traffic those
+locks are what queue the app's queries and (historically) wedged a connection.
+
 ## Troubleshooting
 
+- **Every DB page hangs while `/api/health` stays fast** — a single backend was
+  left waiting on the app (typically after a request was killed mid-query), and
+  because the app shares one connection (`max: 1`) every later request queued
+  behind it forever. The `idea_app` role now carries `statement_timeout=15s`,
+  `lock_timeout=5s`, and `idle_in_transaction_session_timeout=15s` so a stalled
+  query errors instead of piling up. To recover immediately, terminate the
+  stuck backend:
+  `select pg_terminate_backend(pid) from pg_stat_activity where usename='idea_app' and wait_event='ClientRead';`
 - **"DeepSeek hit the output token limit before answering"** — a thinking-mode
   response spent its whole `max_tokens` budget on reasoning and returned no
   answer. Analysis calls use a generous budget; raise it further if a prompt

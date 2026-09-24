@@ -69,6 +69,42 @@ describe("buildPromotedProject", () => {
     expect(context).toContain(ideaText);
   });
 
+  it("carries the personal build lens into the context when present", () => {
+    const withPersonal = standalone({
+      personal_build: {
+        verdict: "use_free",
+        verdict_reason: "ToolX already does this.",
+        worth_it: { value: 3, reason: "not worth it" },
+        build_effort: { size: "small", estimated_hours: 8, reason: "a weekend" },
+        running_cost: { monthly_estimate: 0, notes: "free" },
+        maintenance: { risk: "low", reason: "static" },
+        alternatives: [
+          {
+            name: "ToolX",
+            kind: "oss_selfhost",
+            coverage: "full",
+            pricing: "free",
+            license: "MIT",
+            notes: "does it",
+          },
+        ],
+        cheapest_adequate: { name: "ToolX", cost: "free", notes: "covers it" },
+        mvp_scope: ["capture"],
+        unknowns: ["nothing"],
+      },
+    });
+    const { context } = buildPromotedProject(ideaText, withPersonal);
+    expect(context).toContain("## Personal build lens");
+    expect(context).toContain("Verdict: use_free");
+    expect(context).toContain("ToolX");
+    expect(context).toContain("Minimum viable personal version");
+  });
+
+  it("omits the personal build section when absent", () => {
+    const { context } = buildPromotedProject(ideaText, standalone());
+    expect(context).not.toContain("Personal build lens");
+  });
+
   it("caps the context at the column limit", () => {
     const huge = standalone({
       market_landscape: "m".repeat(2500),

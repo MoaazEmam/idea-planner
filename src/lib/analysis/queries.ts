@@ -3,7 +3,7 @@ import type { ChatMessage, CompletionUsage } from "@/lib/llm/client";
 import { completeValidatedJson } from "@/lib/llm/validate";
 
 const queryResponseSchema = z.object({
-  queries: z.array(z.string().min(3).max(200)).min(1).max(4),
+  queries: z.array(z.string().min(3).max(200)).min(1).max(6),
 });
 
 export type QueryGenerationResult = {
@@ -23,11 +23,27 @@ Write 2 to 4 short queries that would surface:
 
 Each query must be a specific searchable phrase. No boolean operators, no quotes.`;
 
+/**
+ * Appended in personal-tool mode. The extra queries target the alternatives
+ * that decide build-vs-buy: free/open-source tools and comparable paid pricing.
+ */
+const PERSONAL_SYSTEM_ADDITION = `
+
+Also add 1 to 2 more queries that would surface:
+- free or open-source tools that already do this
+- pricing pages for comparable paid tools
+Return at most 6 queries in total.`;
+
 export async function generateSearchQueries(
   ideaText: string,
+  options: { personal?: boolean } = {},
 ): Promise<QueryGenerationResult> {
+  const system = options.personal
+    ? `${SYSTEM_PROMPT}${PERSONAL_SYSTEM_ADDITION}`
+    : SYSTEM_PROMPT;
+
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: system },
     {
       role: "user",
       content: `Idea:\n"""${ideaText}"""\n\nReturn json with a "queries" array.`,

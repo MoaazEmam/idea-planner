@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   linkedAnalysisSchema,
   parseStoredAnalysis,
+  personalStandaloneAnalysisSchema,
   standaloneAnalysisSchema,
 } from "./schema";
 
@@ -46,6 +47,33 @@ function linked(overrides: Record<string, unknown> = {}) {
 function scoreOf(raw: unknown) {
   const parsed = standaloneAnalysisSchema.parse(raw);
   return parsed.scores.market.value;
+}
+
+function personalBuild(overrides: Record<string, unknown> = {}) {
+  return {
+    verdict: "use_free",
+    verdict_reason: "An open-source tool already does this.",
+    worth_it: { value: 4, reason: "not worth the maintenance" },
+    build_effort: { size: "medium", estimated_hours: 20, reason: "one weekend" },
+    running_cost: { monthly_estimate: null, notes: "free to self-host" },
+    maintenance: { risk: "medium", reason: "dependencies move" },
+    alternatives: [
+      {
+        name: "ToolX",
+        kind: "oss_selfhost",
+        license: "MIT",
+        pricing: "free",
+        coverage: "full",
+        notes: "does the job",
+        url: "https://example.com/toolx",
+      },
+    ],
+    cheapest_adequate: { name: "ToolX", cost: "free", notes: "covers it" },
+    mvp_scope: ["capture", "list"],
+    unknowns: ["long-term maintenance"],
+    revisit_trigger: "if ToolX is abandoned",
+    ...overrides,
+  };
 }
 
 describe("score normalisation", () => {
@@ -138,6 +166,52 @@ describe("parseStoredAnalysis", () => {
 
   it("returns null for null", () => {
     expect(parseStoredAnalysis(null)).toBeNull();
+  });
+
+  it("parses a stored standalone analysis carrying the personal lens", () => {
+    const value = {
+      ...standalone(),
+      kind: "standalone",
+      promptVersion: 2,
+      model: "deepseek-flash",
+      generatedAt: "2026-09-20T00:00:00.000Z",
+      searchQueries: ["q"],
+      sources: [{ title: "t", url: "https://example.com" }],
+      personal_build: personalBuild(),
+    };
+    const parsed = parseStoredAnalysis(value);
+    expect(parsed?.kind).toBe("standalone");
+    expect(
+      parsed?.kind === "standalone" ? parsed.personal_build?.verdict : undefined,
+    ).toBe("use_free");
+  });
+});
+
+describe("personalStandaloneAnalysisSchema", () => {
+  it("accepts a standalone analysis with a personal lens", () => {
+    const result = personalStandaloneAnalysisSchema.safeParse({
+      ...standalone(),
+      personal_build: personalBuild(),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a standalone analysis without a personal lens", () => {
+    expect(personalStandaloneAnalysisSchema.safeParse(standalone()).success).toBe(
+      false,
+    );
+  });
+
+  it("rejects an unknown personal verdict", () => {
+    const result = personalStandaloneAnalysisSchema.safeParse({
+      ...standalone(),
+      personal_build: personalBuild({ verdict: "maybe_later" }),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("keeps the base schema valid without a personal lens", () => {
+    expect(standaloneAnalysisSchema.safeParse(standalone()).success).toBe(true);
   });
 });
 

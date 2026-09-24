@@ -97,6 +97,52 @@ function standaloneContext(
     scoreLine("Differentiation", analysis.scores.differentiation),
     scoreLine("Feasibility", analysis.scores.feasibility),
     scoreLine("Monetization", analysis.scores.monetization),
+  );
+
+  if (analysis.personal_build) {
+    const personal = analysis.personal_build;
+    const hours = personal.build_effort.estimated_hours;
+    const effort = hours
+      ? `${personal.build_effort.size} (~${hours}h)`
+      : personal.build_effort.size;
+
+    sections.push(
+      "",
+      "## Personal build lens",
+      `Verdict: ${personal.verdict} — ${personal.verdict_reason}`,
+      scoreLine("Worth building", personal.worth_it),
+      `Effort: ${effort} — ${personal.build_effort.reason}`,
+      `Maintenance risk: ${personal.maintenance.risk} — ${personal.maintenance.reason}`,
+    );
+
+    if (personal.cheapest_adequate) {
+      const { name, cost, notes } = personal.cheapest_adequate;
+      sections.push(
+        `Cheapest adequate alternative: ${name} (${cost}) — ${notes}`,
+      );
+    }
+
+    if (personal.alternatives.length > 0) {
+      sections.push("", "### Alternatives");
+      for (const alternative of personal.alternatives) {
+        const meta: string[] = [alternative.kind];
+        if (alternative.pricing) meta.push(alternative.pricing);
+        if (alternative.license) meta.push(alternative.license);
+        sections.push(
+          `- ${alternative.name} [${meta.join(", ")}]: ${alternative.notes}`,
+        );
+      }
+    }
+
+    if (personal.mvp_scope.length > 0) {
+      sections.push("", "### Minimum viable personal version");
+      for (const item of personal.mvp_scope) {
+        sections.push(`- ${item}`);
+      }
+    }
+  }
+
+  sections.push(
     "",
     "## Next step",
     analysis.next_step,

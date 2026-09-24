@@ -3,7 +3,9 @@ import { completeValidatedJson } from "@/lib/llm/validate";
 import { searchMany, type ResearchResult } from "@/lib/research/tavily";
 import { generateSearchQueries } from "./queries";
 import {
+  PERSONAL_BUILD_VERDICTS,
   STANDALONE_PROMPT_VERSION,
+  personalStandaloneAnalysisSchema,
   standaloneAnalysisSchema,
   type StandaloneStoredAnalysis,
 } from "./schema";
@@ -22,6 +24,9 @@ export type StandaloneEnrichmentResult = {
   credits: number;
   error?: string;
 };
+
+/** `personal` adds the standalone build-vs-buy lens; it never removes the commercial one. */
+export type StandaloneEnrichmentOptions = { personal?: boolean };
 
 const SYSTEM_PROMPT = `You are a blunt startup analyst. You judge one raw product idea against web research.
 Return only json.
@@ -49,6 +54,39 @@ const USER_INSTRUCTIONS = `Return json with keys:
 - risks: array of the things most likely to kill it
 - next_step: the single next action to validate it cheaply
 - scores: {market, differentiation, feasibility, monetization}, each {value, reason}`;
+
+/**
+ * Personal-tool lens. This is an addition to the commercial analysis, not a
+ * replacement: the question is whether this needs to be built at all, given
+ * what already exists, so "do not build it" must be a reachable answer.
+ */
+const PERSONAL_SYSTEM_ADDITION = `
+
+You also judge whether this needs to be built at all, by one person using AI tooling.
+- Compare honestly against free/open-source and paid alternatives.
+- Never invent a price, license, or product. If a source does not state a price, write "unknown (check)".
+- "You need a script, not an app" and "an existing tool already does this" are valid, valuable verdicts.
+- Do not pad the alternatives list; only include tools the sources actually show.`;
+
+const PERSONAL_USER_ADDITION = `
+
+Also return a "personal_build" object with keys:
+- verdict: one of ${PERSONAL_BUILD_VERDICTS.join(" | ")}
+- verdict_reason: 2-3 sentences justifying the verdict
+- worth_it: {value, reason} — is building it justified at all, given alternatives
+- build_effort: {size: small | medium | large, estimated_hours (optional number), reason}
+- running_cost: {monthly_estimate (number or null if unknown), notes} — what it costs to operate
+- maintenance: {risk: low | medium | high, reason} — how likely it is to rot
+- alternatives: array of {name, kind: oss_selfhost | oss_cloud | paid_saas | freemium | manual, license, pricing, priced_at, hosting: self | cloud | both, coverage: full | partial | adjacent, notes, url}
+- cheapest_adequate: {name, cost, notes} — the cheapest option that actually covers the need (optional)
+- mvp_scope: array of the smallest set of things a personal version would need
+- unknowns: array of things the sources do not settle
+- revisit_trigger: what would change this verdict (optional)`;
+
+/** Turns the shared prompt into the personal variant when requested. */
+function personalPrompt(base: string, addition: string, personal: boolean): string {
+  return personal ? `${base}${addition}` : base;
+}
 
 function sourceBlock(sources: ResearchResult[]): string {
   return sources
@@ -86,9 +124,11 @@ function addUsage(a: CompletionUsage, b: CompletionUsage): CompletionUsage {
 export async function enrichStandalone(
   ideaText: string,
   clarifications: string[] = [],
+  options: StandaloneEnrichmentOptions = {},
 ): Promise<StandaloneEnrichmentResult> {
+  const personal = options.personal ?? false;
   const sourceText = ideaSourceText(ideaText, clarifications);
-  const queryResult = await generateSearchQueries(sourceText);
+  const queryResult = await generateSearchQueries(sourceText, { personal });
 
   let usage = queryResult.usage;
 
@@ -129,14 +169,23 @@ export async function enrichStandalone(
   }
 
   const analysisResult = await completeValidatedJson({
-    schema: standaloneAnalysisSchema,
+    schema: personal
+      ? personalStandaloneAnalysisSchema
+      : standaloneAnalysisSchema,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "system",
+        content: personalPrompt(SYSTEM_PROMPT, PERSONAL_SYSTEM_ADDITION, personal),
+      },
       {
         role: "user",
         content: `Idea:\n"""${ideaText}"""${clarificationBlock(
           clarifications,
-        )}\n\nSources:\n${sourceBlock(sources)}\n\n${USER_INSTRUCTIONS}`,
+        )}\n\nSources:\n${sourceBlock(sources)}\n\n${personalPrompt(
+          USER_INSTRUCTIONS,
+          PERSONAL_USER_ADDITION,
+          personal,
+        )}`,
       },
     ],
     options: { kind: "analysis", thinking: true, maxTokens: 12000 },

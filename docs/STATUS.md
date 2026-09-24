@@ -38,6 +38,7 @@ they reflect the order the work actually landed.
 | 8 | Promote an idea to a project, carrying the analysis into project context | `468a937` |
 | 9 | Iterative ideas: append-only additions folded into the analysis + source hash | `468a937` |
 | — | Spinoffs run standalone market research alongside the fit analysis | `468a937` |
+| 10 | Personal-tool lens: standalone build-vs-buy analysis, on-demand tab, `/api/ideas/[id]/personal-analysis` | `b78ef15` … `fe0d03e` |
 
 Three production bugs were found and fixed along the way: trailing prose after
 `json_object` output (`721903d`), thinking-mode responses exhausting
@@ -47,6 +48,13 @@ source hash).
 
 ## Verified
 
+- Personal-tool lens (phase 10): `npm run build`, `typecheck`, and `lint` clean;
+  `npm test` → 63 passed (schema v1-blob back-compat, the required personal
+  block, the mocked `enrichStandalone` wiring, and a `react-dom/server` render
+  test for the new view). Locally against `next dev`: the endpoint's auth gate
+  (401), malformed id (404), and non-standalone rejection (422) all hold, and
+  standalone idea pages server-render the new tabs. The paid research path was
+  not exercised end-to-end.
 - Phase 7 + wave 1 + wave 2, locally: `npm run build`, `typecheck`, and `lint`
   clean; `npm test` → 48 passed (new tests for the promote builder and
   additions-aware staleness). Migrations `0005` (`login_attempts`) and `0006`

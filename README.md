@@ -64,6 +64,14 @@ A `spinoff` runs the project-fit analysis **and** standalone market research
 together, because a spinoff is its own product rather than a feature. If the
 research half fails, the fit analysis is still saved.
 
+A standalone idea can also be read as a **personal tool**, on demand, from a
+second tab on its page. This lens sits beside the commercial scores, not in
+place of them: it weighs the idea against free/open-source and paid
+alternatives, estimates effort, running cost, and maintenance risk, and returns
+a `build` / `fork` / `use_free` / `buy` / `simpler_form` / `do_nothing` verdict.
+Pricing is only taken from the researched sources, and "unknown (check)" is an
+accepted answer, so a stale or missing price is visible rather than invented.
+
 ## Stack
 
 Next.js 16 (App Router, Node runtime) · TypeScript strict · Tailwind v4 ·
@@ -155,6 +163,7 @@ Vercel environment variables only take effect after a redeploy.
 | `POST /api/ideas` | ingest token or session | `Idempotency-Key` supported |
 | `PATCH` / `DELETE /api/ideas/[id]` | session | edit text / soft delete |
 | `POST /api/ideas/[id]/reanalyze` | session | re-run analysis for one idea |
+| `POST /api/ideas/[id]/personal-analysis` | session | on-demand build-vs-buy lens for a standalone idea |
 | `POST /api/ideas/[id]/link` | session | manual sort: unsorted, standalone, feature, spinoff |
 | `POST /api/ideas/[id]/additions` · `DELETE /api/ideas/[id]/additions/[additionId]` | session | append / remove a clarification |
 | `POST /api/ideas/[id]/promote` | session | create a project from an idea, linked as a spinoff |

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
+import { AnalysisTabs } from "./analysis-tabs";
 import { AnalysisView } from "./analysis-view";
 import { IdeaAdditions } from "./idea-additions";
 import { IdeaDetail } from "./idea-detail";
@@ -129,7 +130,11 @@ export default async function IdeaPage(props: PageProps<"/ideas/[id]">) {
             {analysis.kind === "standalone" ? "Research" : "Project analysis"}
           </h2>
           {analysis.kind === "standalone" ? (
-            <AnalysisView analysis={analysis} />
+            <AnalysisTabs
+              ideaId={idea.id}
+              commercial={<AnalysisView analysis={analysis} />}
+              personalBuild={analysis.personal_build ?? null}
+            />
           ) : (
             <LinkedAnalysisView analysis={analysis} />
           )}

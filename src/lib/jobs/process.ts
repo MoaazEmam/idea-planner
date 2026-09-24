@@ -38,6 +38,14 @@ export type ReanalyzeOutcome =
   | { ok: true; status: string; error?: string }
   | { ok: false; reason: "not_found" | "busy" | "disabled"; message: string };
 
+export type PersonalAnalysisOutcome =
+  | { ok: true; status: string; error?: string }
+  | {
+      ok: false;
+      reason: "not_found" | "busy" | "disabled" | "unsupported";
+      message: string;
+    };
+
 export type ManualRouteOutcome = ReanalyzeOutcome;
 
 export function processingEnabled(): boolean {
@@ -471,6 +479,78 @@ export async function reanalyzeIdea(
 
   try {
     return { ok: true, ...(await analyzeIdea(claimed.idea, null)) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "analysis failed";
+    await markFailed(ideaId, message);
+    return { ok: true, status: "failed", error: message };
+  }
+}
+
+/**
+ * On-demand build-vs-buy lens for a standalone idea. Unlike `reanalyzeIdea`
+ * this never re-routes: the idea already stands alone and running the routing
+ * model again could quietly move it. It only adds or refreshes the lens.
+ */
+export async function analyzePersonal(
+  ideaId: string,
+): Promise<PersonalAnalysisOutcome> {
+  if (!processingEnabled()) {
+    return { ok: false, reason: "disabled", message: "processing is disabled" };
+  }
+
+  const db = getDb();
+  const existing = await db.query.ideas.findFirst({
+    where: and(eq(ideas.id, ideaId), isNull(ideas.deletedAt)),
+  });
+
+  if (!existing) {
+    return { ok: false, reason: "not_found", message: "idea not found" };
+  }
+
+  // A feature or spinoff is judged for fit inside a project, not build-vs-buy.
+  if (existing.linkType !== "standalone") {
+    return {
+      ok: false,
+      reason: "unsupported",
+      message: "the personal lens applies to standalone ideas",
+    };
+  }
+
+  const claimed = await claimIdeaById(ideaId, { clearAnalysis: false });
+  if (!claimed.ok) {
+    return { ok: false, reason: claimed.reason, message: claimed.message };
+  }
+
+  const idea = claimed.idea;
+  const clarifications = await listAdditionTexts(idea.id);
+
+  try {
+    const enrichment = await enrichStandalone(idea.rawText, clarifications, {
+      personal: true,
+    });
+
+    if (!enrichment.analysis) {
+      const message = enrichment.error ?? "personal analysis produced no result";
+      await markFailed(idea.id, message, enrichment.raw);
+      return { ok: true, status: "failed", error: message };
+    }
+
+    await markEnriched(
+      idea.id,
+      {
+        decision: {
+          status: "standalone",
+          projectId: null,
+          linkType: "standalone",
+          confidence: idea.linkConfidence ?? 0,
+          reasoning: "",
+        },
+        source: "auto",
+      },
+      enrichment.analysis,
+      enrichment.raw,
+    );
+    return { ok: true, status: "enriched" };
   } catch (error) {
     const message = error instanceof Error ? error.message : "analysis failed";
     await markFailed(ideaId, message);

@@ -52,6 +52,7 @@ check "unauthenticated capture is 401" "401" "$(status -X POST "$APP_URL/api/ide
 check "bad bearer token is 401" "401" "$(status -X POST "$APP_URL/api/ideas" -H 'Authorization: Bearer nope' -H 'Content-Type: application/json' -d '{"raw_text":"x"}')"
 check "private page redirects when signed out" "307" "$(status "$APP_URL/")"
 check "wrong passphrase is rejected" "303" "$(status -X POST "$APP_URL/api/login" -d 'passphrase=definitely-wrong')"
+check "personal lens without a session is 401" "401" "$(status -X POST "$APP_URL/api/ideas/00000000-0000-0000-0000-000000000000/personal-analysis")"
 
 echo "capture with idempotency"
 first=$(curl -s -m 10 -w '\n%{http_code}' -X POST "$APP_URL/api/ideas" \
@@ -82,6 +83,11 @@ printf '%s' "$home" | grep -q "$IDEMPOTENCY_KEY" && check "captured idea appears
 check "idea detail page loads" "200" "$(status -b "$COOKIE_JAR" "$APP_URL/ideas/$idea_id")"
 check "unknown idea is 404" "404" "$(status -b "$COOKIE_JAR" "$APP_URL/ideas/00000000-0000-0000-0000-000000000000")"
 check "malformed id is 404, not 500" "404" "$(status -b "$COOKIE_JAR" "$APP_URL/ideas/not-a-uuid")"
+
+echo "personal lens"
+check "malformed id is 404" "404" "$(status -b "$COOKIE_JAR" -X POST "$APP_URL/api/ideas/not-a-uuid/personal-analysis")"
+# A brand-new capture is not routed yet, so it has no standalone link to analyse.
+check "personal lens on an unrouted idea is 422" "422" "$(status -b "$COOKIE_JAR" -X POST "$APP_URL/api/ideas/$idea_id/personal-analysis")"
 
 echo "projects"
 create_project=$(curl -s -m 10 -w '\n%{http_code}' -b "$COOKIE_JAR" -X POST "$APP_URL/api/projects" \
